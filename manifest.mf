@@ -1,0 +1,6 @@
+Manifest-Version: 1.0
+Ant-Version: Apache Ant 1.8.3
+Created-By: 1.7.0_11-b21 (Oracle Corporation)
+Class-Path: lib/*.jar
+Main-Class: co.paralleluniverse.spaceships.Spaceships
+

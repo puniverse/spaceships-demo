@@ -1,0 +1,40 @@
+<!--
+   Licensed to the Apache Software Foundation (ASF) under one
+   or more contributor license agreements.  See the NOTICE file
+   distributed with this work for additional information
+   regarding copyright ownership.  The ASF licenses this file
+   to you under the Apache License, Version 2.0 (the
+   "License"); you may not use this file except in compliance
+   with the License.  You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing,
+   software distributed under the License is distributed on an
+   "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+   KIND, either express or implied.  See the License for the
+   specific language governing permissions and limitations
+   under the License.    
+-->
+<ivysettings>
+    <!-- for documentation about this file, see
+    http://ant.apache.org/ivy/history/trunk/settings.html -->
+    <settings defaultResolver="default"/>
+    <resolvers>
+        <chain name="public">
+            <!-- This is the default maven 2 repository -->
+            <ibiblio name="m2repo" m2compatible="true" />
+            <!--
+            Add additional public repositories here.
+            eg == java.net repo, containing useful java apis ==
+            <ibiblio name="java.net" root="http://download.java.net/maven/1/"
+                                     pattern="[organisation]/[type]s/[artifact]-[revision].[ext]"/>
+             -->
+        </chain>
+    </resolvers>
+
+    <include url="${ivy.default.settings.dir}/ivysettings-shared.xml"/>
+    <include url="${ivy.default.settings.dir}/ivysettings-local.xml"/>
+    <include url="${ivy.default.settings.dir}/ivysettings-main-chain.xml"/>
+    <include url="${ivy.default.settings.dir}/ivysettings-default-chain.xml"/>
+</ivysettings>

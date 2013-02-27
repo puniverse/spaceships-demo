@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+To change this template, choose Tools | Templates
+and open the template in the editor.
+-->
+
+
+<project name="ivy-build" default="default" basedir="." xmlns:ivy="antlib:org.apache.ivy.ant">    
+    <target name="-ivy-retrieve">
+        <ivy:retrieve pattern="${build.dir}/lib/[artifact]-[revision].[ext]" type="jar,bundle" sync="true"/> <!-- Load dependencies to the project -->
+        <pathconvert property="ivy.classpath.computed" dirsep="/" pathsep=":">
+            <path>
+                <fileset dir="${build.dir}/lib" includes="*.jar"/>
+            </path>
+            <map from="${basedir}${file.separator}" to=""/>
+        </pathconvert>
+        <echo level="error" message="computed classpath: ${ivy.classpath.computed}"/>
+        <propertyfile file="nbproject/project.properties">
+            <entry operation="=" key="ivy.classpath" value="${ivy.classpath.computed}"/>
+        </propertyfile>
+    </target>
+</project>
