@@ -23,4 +23,4 @@ ant
 
 ## Usage
 
-Use the arrow keys or mouse scrolling to move the viewport. To zoom in/out use `+` `-`.
+Use the arrow keys or mouse scrolling to move the viewport. To zoom in/out use `+` `-` or Ctrl+mouse-scroll.
