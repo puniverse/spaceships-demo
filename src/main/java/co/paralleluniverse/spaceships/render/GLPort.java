@@ -251,8 +251,8 @@ public class GLPort implements GLEventListener {
 
         final GL3 gl = drawable.getGL().getGL3();
         try {
-            spaceshipTex = TextureIO.newTexture(TextureIO.newTextureData(GLProfile.get(GLProfile.GL3), new FileInputStream("spaceship.png"), false, "png"));
-            explosionTex = TextureIO.newTexture(TextureIO.newTextureData(GLProfile.get(GLProfile.GL3), new FileInputStream("explosion.png"), false, "png"));
+            spaceshipTex = TextureIO.newTexture(TextureIO.newTextureData(GLProfile.get(GLProfile.GL3), ClassLoader.getSystemResourceAsStream("spaceship.png"), false, "png"));
+            explosionTex = TextureIO.newTexture(TextureIO.newTextureData(GLProfile.get(GLProfile.GL3), ClassLoader.getSystemResourceAsStream("explosion.png"), false, "png"));
         } catch (IOException ex) {
             throw new RuntimeException(ex);
         }
