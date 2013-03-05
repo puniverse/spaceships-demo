@@ -1,0 +1,16 @@
+
+This product depends on 'jogl', java binding for the OpenGL API
+
+  * LICENSE: Creative Commons Attribution 3.0 License.
+  * HOMEPAGE: https://jogamp.org/jogl/www/
+
+The file 'spaceship.png', is a png icon by Everaldo Coelho
+
+  * LICENSE: GNU LGPL
+  * HOMEPAGE: http://www.iconfinder.com/icondetails/3464/128/kspaceduel_spaceship_icon
+
+The file 'explosion.png', is a png icon by Christian "Crystan" Hoffmann
+
+  * LICENSE: Creative Commons Attribution-Share Alike 3.0 License.
+  * HOMEPAGE: http://ufoai.org/licenses/pics/license-cc-by-sa-30.html
+
