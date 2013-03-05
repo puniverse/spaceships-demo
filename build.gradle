@@ -1,0 +1,38 @@
+apply plugin: 'java'
+
+sourceSets {
+    main {
+        java {
+            srcDir 'src'
+        }
+    }
+}
+dependencies {
+	compile ":spacebase",":jogl-all",":gluegen-rt",":jsr166e","com.yammer.metrics:metrics-core:2.0.2"
+	runtime ":padlock:2.2",":commons-codec:1.3", "com.google.guava:guava:11.0.1","net.sf.trove4j:trove4j:3.0.2"
+}
+repositories {
+    flatDir {
+        dirs 'baselib'
+    }
+    repositories {
+	    mavenCentral()
+	}
+}
+task copyShaders(type:Copy) {
+    from 'src/co/paralleluniverse/spaceships/render/shader'
+    into 'build/classes/main/co/paralleluniverse/spaceships/render/shader'
+}
+classes.dependsOn 'copyShaders'
+
+task(run, dependsOn: 'classes', type: JavaExec) {
+	main = 'co.paralleluniverse.spaceships.Spaceships'
+	classpath = sourceSets.main.runtimeClasspath
+	args '-Xmx2000m'
+	systemProperty 'co.paralleluniverse.spacebase.license.file', 'spacebase-lite.lic'
+}
+task wrapper(type: Wrapper) {
+    gradleVersion = '1.5-20130302103424+0000'
+}
+
+defaultTasks 'build','run'
