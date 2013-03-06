@@ -19,6 +19,8 @@ if (!hasProperty('mainClass')) {
 dependencies {
 	compile ":spacebase",":jogl-all",":gluegen-rt",":jsr166e","com.yammer.metrics:metrics-core:2.0.2"
 	runtime ":padlock:2.2",":commons-codec:1.3", "com.google.guava:guava:11.0.1","net.sf.trove4j:trove4j:3.0.2"
+        runtime ":jogl-all-natives-linux-i586",":jogl-all-natives-macosx-universal",":jogl-all-natives-windows-i586"
+        runtime ":gluegen-rt-natives-linux-i586",":gluegen-rt-natives-macosx-universal",":gluegen-rt-natives-windows-i586"
 }
 repositories {
     flatDir {
@@ -38,5 +40,5 @@ task wrapper(type: Wrapper) {
 }
 tasks.withType(JavaExec) {
     jvmArgs '-Xmx2000m'
-    systemProperties 'co.paralleluniverse.spacebase.license.file': 'build/resources/main/spacebase-lite.lic'    
 }
+defaultTasks 'build','run'
