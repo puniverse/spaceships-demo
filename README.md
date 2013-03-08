@@ -14,6 +14,12 @@ JDK 7 is required. We use Gradle build system. In order to build and run type in
 ```sh
 ./gradlew
 ```
+or in windows:
+```
+gradlew.bat
+```
+This will download and install gradle build system and the build and run the project.
+Enjoy !
 
 ## Usage
 Use the arrow keys or mouse scrolling to move the viewport. To zoom in/out use `+` `-` or Ctrl+mouse-scroll.
