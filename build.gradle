@@ -43,6 +43,6 @@ task wrapper(type: Wrapper) {
     gradleVersion = '1.5-20130302103424+0000'
 }
 tasks.withType(JavaExec) {
-    jvmArgs '-Xmx2000m'
+    jvmArgs '-Xmx1024m'
 }
 defaultTasks 'build','run'
