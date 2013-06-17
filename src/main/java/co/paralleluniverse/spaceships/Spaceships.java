@@ -19,13 +19,14 @@
  */
 package co.paralleluniverse.spaceships;
 
+import co.paralleluniverse.common.monitoring.Metrics;
+import co.paralleluniverse.db.api.DbExecutors;
+import co.paralleluniverse.db.api.Sync;
 import co.paralleluniverse.spacebase.AABB;
 import co.paralleluniverse.spacebase.MutableAABB;
 import co.paralleluniverse.spacebase.SpaceBase;
 import co.paralleluniverse.spacebase.SpaceBaseBuilder;
-import co.paralleluniverse.spacebase.SpaceBaseExecutors;
 import co.paralleluniverse.spacebase.SpatialToken;
-import co.paralleluniverse.spacebase.Sync;
 import co.paralleluniverse.spaceships.render.GLPort;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -179,9 +180,9 @@ public class Spaceships {
         SpaceBaseBuilder builder = new SpaceBaseBuilder();
 
         if (parallel)
-            builder.setExecutor(SpaceBaseExecutors.parallel(parallelism));
+            builder.setExecutor(DbExecutors.parallel(parallelism));
         else
-            builder.setExecutor(SpaceBaseExecutors.concurrent(CLEANUP_THREADS));
+            builder.setExecutor(DbExecutors.concurrent(CLEANUP_THREADS));
 
         builder.setQueueBackpressure(1000);
 
@@ -196,8 +197,13 @@ public class Spaceships {
         builder.setNodeWidth(nodeWidth);
 
         builder.setMonitoringType(SpaceBaseBuilder.MonitorType.JMX);
-        if (metricsDir != null)
-            com.yammer.metrics.reporting.CsvReporter.enable(metricsDir, 1, TimeUnit.SECONDS);
+        if (metricsDir != null) {
+            com.codahale.metrics.CsvReporter.forRegistry(Metrics.registry())
+                    .convertRatesTo(TimeUnit.SECONDS)
+                    .convertDurationsTo(TimeUnit.MILLISECONDS)
+                    .build(metricsDir)
+                    .start(1, TimeUnit.SECONDS);
+        }
 
         final SpaceBase<Spaceship> space = builder.build("base1");
         return space;
@@ -217,7 +223,7 @@ public class Spaceships {
             System.out.println("Inserted " + N + " things in " + millis(insrertStart));
         }
         long initTime = System.nanoTime();
-        
+
         if (timeStream != null)
             timeStream.println("# time, millis, millis1, millis0");
 
@@ -255,8 +261,8 @@ public class Spaceships {
 
             millis = millis(cycleStart);
 
-            if (port == null & 
-                    (millis < POSTPONE_GLPORT_UNTIL_SB_CYCLE_UNDER_X_MILLIS
+            if (port == null
+                    & (millis < POSTPONE_GLPORT_UNTIL_SB_CYCLE_UNDER_X_MILLIS
                     | millis(initTime) > MAX_PORT_POSTPONE_MILLIS)) // wait for JIT to make everything run smoothly before opening port
                 port = new GLPort(toolkit, N, Spaceships.this, bounds);
 

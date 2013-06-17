@@ -19,6 +19,7 @@
  */
 package co.paralleluniverse.spaceships;
 
+import co.paralleluniverse.db.api.Sync;
 import co.paralleluniverse.spacebase.AABB;
 import static co.paralleluniverse.spacebase.AABB.X;
 import static co.paralleluniverse.spacebase.AABB.Y;
@@ -28,7 +29,6 @@ import co.paralleluniverse.spacebase.SpatialModifyingVisitor;
 import co.paralleluniverse.spacebase.SpatialQueries;
 import co.paralleluniverse.spacebase.SpatialSetVisitor;
 import co.paralleluniverse.spacebase.SpatialToken;
-import co.paralleluniverse.spacebase.Sync;
 import static java.lang.Math.cos;
 import static java.lang.Math.sin;
 import java.util.Set;
