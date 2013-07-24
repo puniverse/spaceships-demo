@@ -5,33 +5,31 @@ sourceCompatibility = '1.7'
 
 version = "1.0-SNAPSHOT"
 
-// NetBeans will automatically add "run" and "debug" tasks relying on the
-// "mainClass" property. You may however define the property prior executing
-// tasks by passing a "-PmainClass=<QUALIFIED_CLASS_NAME>" argument.
-//
-// Note however, that you may define your own "run" and "debug" task if you
-// prefer. In this case NetBeans will not add these tasks but you may rely on
-// your own implementation.
 mainClassName = 'co.paralleluniverse.spaceships.Spaceships'
 
 if (!hasProperty('mainClass')) {
     ext.mainClass = mainClassName
 }
 
+configurations {
+  quasar
+}
+
 dependencies {
     compile ":spacebase"
     compile ":jsr166e"
-    compile "co.paralleluniverse:quasar:0.2-SNAPSHOT"
-    compile "com.codahale.metrics:metrics-core:3.0.0-RC1" 
+    compile "co.paralleluniverse:quasar-core:0.2.0"
+    compile "com.codahale.metrics:metrics-core:3.0.0" 
     compile ":jogl-all",":gluegen-rt"
     runtime ":padlock:2.2"
     runtime ":commons-codec:1.3" 
-    runtime "com.google.guava:guava:11.0.1"
+    runtime "com.google.guava:guava:14.0.1"
     runtime "net.sf.trove4j:trove4j:3.0.2"        
     // Download natives from https://jogamp.org/deployment/autobuilds/master/jogl-b899-2013-01-19_20-17-11/
     // Download natives from https://jogamp.org/deployment/autobuilds/master/gluegen-b625-2013-01-19_07-06-09/
     runtime ":jogl-all-natives-linux-i586",":jogl-all-natives-macosx-universal",":jogl-all-natives-windows-i586",":jogl-all-natives-linux-amd64",":jogl-all-natives-windows-amd64"
     runtime ":gluegen-rt-natives-linux-i586",":gluegen-rt-natives-macosx-universal",":gluegen-rt-natives-windows-i586",":gluegen-rt-natives-linux-amd64",":gluegen-rt-natives-windows-amd64"
+    quasar  "co.paralleluniverse:quasar-core:0.2.0"
 }
 repositories {
     flatDir {
@@ -54,5 +52,7 @@ task wrapper(type: Wrapper) {
 }
 tasks.withType(JavaExec) {
     jvmArgs '-Xmx1024m'
+    jvmArgs "-javaagent:${configurations.quasar.iterator().next()}" // =v, =d
 }
+
 defaultTasks 'build','run'

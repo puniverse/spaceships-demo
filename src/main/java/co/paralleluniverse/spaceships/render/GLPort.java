@@ -23,11 +23,11 @@ import co.paralleluniverse.spacebase.AABB;
 import static co.paralleluniverse.spacebase.AABB.X;
 import static co.paralleluniverse.spacebase.AABB.Y;
 import co.paralleluniverse.spacebase.MutableAABB;
-import co.paralleluniverse.spacebase.SpaceBase;
 import co.paralleluniverse.spacebase.SpatialQueries;
 import co.paralleluniverse.spacebase.SpatialQuery;
 import co.paralleluniverse.spacebase.SpatialToken;
 import co.paralleluniverse.spacebase.SpatialVisitor;
+import co.paralleluniverse.spacebase.SpaceBase;
 import co.paralleluniverse.spaceships.Spaceship;
 import co.paralleluniverse.spaceships.Spaceships;
 import com.jogamp.newt.awt.NewtCanvasAWT;
@@ -40,7 +40,6 @@ import com.jogamp.opengl.util.texture.Texture;
 import com.jogamp.opengl.util.texture.TextureIO;
 import java.awt.Component;
 import java.awt.Frame;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.FloatBuffer;
 import java.util.Collection;
@@ -79,8 +78,7 @@ public class GLPort implements GLEventListener {
     public static final int MAX_PORT_WIDTH = 400;
     public static final String WINDOW_TITLE = "Spaceships";
     private long lastSBQueryTime = 0;
-    private Collection<Object> lastSBQueryResult = null;
-    private long lastSBCycleStart = 0;
+    private Collection<Spaceship> lastSBQueryResult = null;
     private Texture spaceshipTex;
     private Texture explosionTex;
     private ShaderProgram shaderProgram;
@@ -154,7 +152,7 @@ public class GLPort implements GLEventListener {
         TOOLKIT = toolkit;
         this.maxItems = maxItems;
         this.global = global;
-        this.sb = global.sb;
+        this.sb = global.getPlainSpaceBase();
         this.bounds = bounds;
 
         final GLProfile glp = GLProfile.get(GLProfile.GL3);
@@ -321,7 +319,7 @@ public class GLPort implements GLEventListener {
         vertices.destroy(gl);
     }
 
-    public Collection<Object> query(SpatialQuery<? super Spaceship> query) {
+    public Collection<Spaceship> query(SpatialQuery<? super Spaceship> query) {
         try {
             final Collection<Object> resultSet = sb.createCollection();
             sb.query(query, new SpatialVisitor<Spaceship>() {
@@ -334,7 +332,7 @@ public class GLPort implements GLEventListener {
                 public void done() {
                 }
             }).join();
-            return Collections.unmodifiableCollection(resultSet);
+            return Collections.unmodifiableCollection((Collection<Spaceship>)(Object)resultSet);
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         }
@@ -364,15 +362,13 @@ public class GLPort implements GLEventListener {
         MutableAABB currentPort = getCurrentPort(ct);
         portToMvMatrix(currentPort);
         double margins = WIDTH_MARGINS;
-        if (ct - lastSBQueryTime > SB_QUERY_RATE | lastSBCycleStart != global.getCycleStart()) {
+        if (ct - lastSBQueryTime > SB_QUERY_RATE) {
             lastSBQueryTime = ct;
             lastSBQueryResult = query(SpatialQueries.contained(AABB.create(currentPort.min(X) - margins, currentPort.max(X) + margins, currentPort.min(Y) - margins, currentPort.max(Y) + margins)));
-            lastSBCycleStart = global.getCycleStart();
         }
         double[] pos;
         int countInPort = 0;
-        for (Object o : lastSBQueryResult) {
-            Spaceship s = (Spaceship) o;
+        for (final Spaceship s : lastSBQueryResult) {
             if (s.getLastMoved() > 0) {
                 long exrapolationTime;
 
@@ -392,7 +388,7 @@ public class GLPort implements GLEventListener {
                 colorsb.put((float) s.getCurrentHeading(exrapolationTime));
 
                 // put the shootLength (0 for ship wihout shoot)
-                colorsb.put(ct - s.getShootTime() < SHOOT_DURATION ? (float) s.getShootLength() : 0f);
+                colorsb.put(ct - s.getShotTime() < SHOOT_DURATION ? (float) s.getShotLength() : 0f);
             }
             if (port.contains(s.getAABB()))
                 countInPort++;
