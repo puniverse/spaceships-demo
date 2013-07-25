@@ -20,7 +20,6 @@
 package co.paralleluniverse.spaceships;
 
 import co.paralleluniverse.common.monitoring.Metrics;
-import co.paralleluniverse.db.api.DbExecutors;
 import co.paralleluniverse.fibers.Fiber;
 import co.paralleluniverse.spacebase.AABB;
 import co.paralleluniverse.spacebase.quasar.SpaceBase;
@@ -33,7 +32,6 @@ import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
-import jsr166e.ForkJoinPool;
 
 public class Spaceships {
     public static Spaceships spaceships;
@@ -60,20 +58,22 @@ public class Spaceships {
         spaceships.run();
     }
     //
+    private final GLPort.Toolkit toolkit;
     public final SpaceBase<Spaceship> sb;
-    public final boolean extrapolate;
+    private GLPort port = null;
     public final RandSpatial random;
+    //
+    private final int N;
     public final AABB bounds;
+    public final boolean extrapolate;
     public final double speedVariance;
     public final boolean async;
     public final double range;
     private File metricsDir;
     private PrintStream configStream;
     private PrintStream timeStream;
-    private final GLPort.Toolkit toolkit;
-    private final int N;
+    //
     private long cycleStart;
-    private GLPort port = null;
 
     public Spaceships(Properties props) throws Exception {
         final int parallelism = Integer.parseInt(props.getProperty("parallelism", "2"));
@@ -124,8 +124,6 @@ public class Spaceships {
      * reads properties file and creates a SpaceBase instance with the requested properties.
      */
     private SpaceBase<Spaceship> initSpaceBase(Properties props) {
-
-
         final boolean optimistic = Boolean.parseBoolean(props.getProperty("optimistic", "true"));
         final int optimisticHeight = Integer.parseInt(props.getProperty("optimistic-height", "1"));
         final int optimisticRetryLimit = Integer.parseInt(props.getProperty("optimistic-retry-limit", "3"));
