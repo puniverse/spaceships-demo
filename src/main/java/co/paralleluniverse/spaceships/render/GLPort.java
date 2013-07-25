@@ -25,9 +25,7 @@ import static co.paralleluniverse.spacebase.AABB.Y;
 import co.paralleluniverse.spacebase.MutableAABB;
 import co.paralleluniverse.spacebase.SpatialQueries;
 import co.paralleluniverse.spacebase.SpatialQuery;
-import co.paralleluniverse.spacebase.SpatialToken;
-import co.paralleluniverse.spacebase.SpatialVisitor;
-import co.paralleluniverse.spacebase.SpaceBase;
+import co.paralleluniverse.spacebase.simple.SimpleSpaceBase;
 import co.paralleluniverse.spaceships.Spaceship;
 import co.paralleluniverse.spaceships.Spaceships;
 import com.jogamp.newt.awt.NewtCanvasAWT;
@@ -43,7 +41,6 @@ import java.awt.Frame;
 import java.io.IOException;
 import java.nio.FloatBuffer;
 import java.util.Collection;
-import java.util.Collections;
 import javax.media.opengl.DebugGL3;
 import javax.media.opengl.GL;
 import javax.media.opengl.GL2ES2;
@@ -66,6 +63,9 @@ import javax.media.opengl.fixedfunc.GLMatrixFunc;
  * @author pron
  */
 public class GLPort implements GLEventListener {
+    public enum Toolkit {
+        NEWT, NEWT_CANVAS, AWT
+    };
     public static final int WINDOW_WIDTH = 1200;
     public static final int WINDOW_HEIGHT = 700;
     public static final double ZOOM_UNIT = 0.1;
@@ -77,6 +77,7 @@ public class GLPort implements GLEventListener {
     public static final int WIDTH_MARGINS = 800;
     public static final int MAX_PORT_WIDTH = 400;
     public static final String WINDOW_TITLE = "Spaceships";
+    //
     private long lastSBQueryTime = 0;
     private Collection<Spaceship> lastSBQueryResult = null;
     private Texture spaceshipTex;
@@ -89,50 +90,12 @@ public class GLPort implements GLEventListener {
     private double portMinXAnimation = 0;
     private double portMaxYAnimation = 0;
     private double portMinYAnimation = 0;
-    private double heading = 0;
-
-    private MutableAABB getCurrentPort(final long ct) {
-        if (portMaxXAnimation == 0)
-            return port;
-        MutableAABB currentPort = MutableAABB.create(2);
-        final double width = port.max(X) - port.min(X);
-        final double height = port.max(Y) - port.min(Y);
-        final double ratio = height / width;
-        double animation = Math.min(1.0, (double) (ct - portAnimationStartTime) / ANIMATION_DURATION);
-        currentPort.min(X, port.min(X) + animation * portMinXAnimation);
-        currentPort.min(Y, port.min(Y) + animation * portMinYAnimation);
-        currentPort.max(X, port.max(X) + animation * portMaxXAnimation);
-        currentPort.max(Y, port.max(Y) + animation * portMaxYAnimation);
-        return currentPort;
-    }
-
-    private void fixPort(final long ct, boolean onlyIfFinished) {
-        final double width = port.max(X) - port.min(X);
-        final double height = port.max(Y) - port.min(Y);
-        final double ratio = height / width;
-        double animation = Math.min(1.0, (double) (ct - portAnimationStartTime) / ANIMATION_DURATION);
-        if (onlyIfFinished & animation < 1.0)
-            return;
-        port.min(X, port.min(X) + animation * portMinXAnimation);
-        port.min(Y, port.min(Y) + animation * portMinYAnimation);
-        port.max(X, port.max(X) + animation * portMaxXAnimation);
-        port.max(Y, port.max(Y) + animation * portMaxYAnimation);
-        portMaxXAnimation -= animation * portMaxXAnimation;
-        portMinXAnimation -= animation * portMinXAnimation;
-        portMaxYAnimation -= animation * portMaxYAnimation;
-        portMinYAnimation -= animation * portMinYAnimation;
-        portAnimationStartTime = ct;
-    }
-
-    public enum Toolkit {
-        NEWT, NEWT_CANVAS, AWT
-    };
     private final Toolkit TOOLKIT;
     //
     private static final float KEY_PRESS_TRANSLATE = 10.0f;
     private final Object window;
     private final int maxItems;
-    private final SpaceBase<Spaceship> sb;
+    private final SimpleSpaceBase<Spaceship> sb;
     private final AABB bounds;
     private MutableAABB port = MutableAABB.create(2);
     private ProgramState shaderState;
@@ -152,7 +115,7 @@ public class GLPort implements GLEventListener {
         TOOLKIT = toolkit;
         this.maxItems = maxItems;
         this.global = global;
-        this.sb = global.getPlainSpaceBase();
+        this.sb = new SimpleSpaceBase<Spaceship>(global.getPlainSpaceBase());
         this.bounds = bounds;
 
         final GLProfile glp = GLProfile.get(GLProfile.GL3);
@@ -319,23 +282,11 @@ public class GLPort implements GLEventListener {
         vertices.destroy(gl);
     }
 
-    public Collection<Spaceship> query(SpatialQuery<? super Spaceship> query) {
-        try {
-            final Collection<Object> resultSet = sb.createCollection();
-            sb.query(query, new SpatialVisitor<Spaceship>() {
-                @Override
-                public void visit(Spaceship elem, SpatialToken token) {
-                    resultSet.add(elem);
-                }
-
-                @Override
-                public void done() {
-                }
-            }).join();
-            return Collections.unmodifiableCollection((Collection<Spaceship>)(Object)resultSet);
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
+    private Collection<Spaceship> query(SpatialQuery<? super Spaceship> query) {
+        System.out.println("qqqq 1111");
+        final Collection<Spaceship> ss = sb.query(query);
+        System.out.println("qqqq 2222");
+        return ss;
     }
 
     @Override
@@ -393,7 +344,7 @@ public class GLPort implements GLEventListener {
             if (port.contains(s.getAABB()))
                 countInPort++;
         }
-        setTitle(""+countInPort+ " Spaceships " + (int)(port.max(X) - port.min(X)) + "x" + (int)(port.max(Y) - port.min(Y)) );            
+        setTitle("" + countInPort + " Spaceships " + (int) (port.max(X) - port.min(X)) + "x" + (int) (port.max(Y) - port.min(Y)));
 
         vertices.flip();
         colors.flip();
@@ -482,6 +433,39 @@ public class GLPort implements GLEventListener {
                 portMinYAnimation -= heightToAdd;
             }
         }
+    }
+
+    private MutableAABB getCurrentPort(final long ct) {
+        if (portMaxXAnimation == 0)
+            return port;
+        MutableAABB currentPort = MutableAABB.create(2);
+        final double width = port.max(X) - port.min(X);
+        final double height = port.max(Y) - port.min(Y);
+        final double ratio = height / width;
+        double animation = Math.min(1.0, (double) (ct - portAnimationStartTime) / ANIMATION_DURATION);
+        currentPort.min(X, port.min(X) + animation * portMinXAnimation);
+        currentPort.min(Y, port.min(Y) + animation * portMinYAnimation);
+        currentPort.max(X, port.max(X) + animation * portMaxXAnimation);
+        currentPort.max(Y, port.max(Y) + animation * portMaxYAnimation);
+        return currentPort;
+    }
+
+    private void fixPort(final long ct, boolean onlyIfFinished) {
+        final double width = port.max(X) - port.min(X);
+        final double height = port.max(Y) - port.min(Y);
+        final double ratio = height / width;
+        double animation = Math.min(1.0, (double) (ct - portAnimationStartTime) / ANIMATION_DURATION);
+        if (onlyIfFinished & animation < 1.0)
+            return;
+        port.min(X, port.min(X) + animation * portMinXAnimation);
+        port.min(Y, port.min(Y) + animation * portMinYAnimation);
+        port.max(X, port.max(X) + animation * portMaxXAnimation);
+        port.max(Y, port.max(Y) + animation * portMaxYAnimation);
+        portMaxXAnimation -= animation * portMaxXAnimation;
+        portMinXAnimation -= animation * portMinXAnimation;
+        portMaxYAnimation -= animation * portMaxYAnimation;
+        portMinYAnimation -= animation * portMinYAnimation;
+        portAnimationStartTime = ct;
     }
 
     public void myKeyPressed(int keyCode) {
@@ -618,7 +602,6 @@ public class GLPort implements GLEventListener {
         public void mouseDragged(com.jogamp.newt.event.MouseEvent e) {
         }
     }
-
 //    private void print(FloatBuffer buffer) {
 //        int pos = buffer.position();
 //        System.err.print(buffer.remaining() + ": ");

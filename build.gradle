@@ -7,18 +7,32 @@ version = "1.0-SNAPSHOT"
 
 mainClassName = 'co.paralleluniverse.spaceships.Spaceships'
 
+ 
 if (!hasProperty('mainClass')) {
     ext.mainClass = mainClassName
 }
 
-configurations {
-  quasar
+repositories {
+    flatDir {
+        dirs 'baselib'
+    }
+    repositories {
+        mavenCentral()
+        mavenLocal()
+        maven { url "https://oss.sonatype.org/content/repositories/releases" }
+        maven { url "https://oss.sonatype.org/content/repositories/snapshots" }
+        maven { url "http://download.oracle.com/maven/" }
+    }
 }
 
+configurations {
+    quasar
+}
+    
 dependencies {
     compile ":spacebase"
     compile ":jsr166e"
-    compile "co.paralleluniverse:quasar-core:0.2.0"
+    compile "co.paralleluniverse:quasar-core:0.3.0-SNAPSHOT"
     compile "com.codahale.metrics:metrics-core:3.0.0" 
     compile ":jogl-all",":gluegen-rt"
     runtime ":padlock:2.2"
@@ -31,17 +45,7 @@ dependencies {
     runtime ":gluegen-rt-natives-linux-i586",":gluegen-rt-natives-macosx-universal",":gluegen-rt-natives-windows-i586",":gluegen-rt-natives-linux-amd64",":gluegen-rt-natives-windows-amd64"
     quasar  "co.paralleluniverse:quasar-core:0.2.0"
 }
-repositories {
-    flatDir {
-        dirs 'baselib'
-    }
-    repositories {
-        mavenCentral()
-        maven {
-            url "https://oss.sonatype.org/content/repositories/snapshots"
-        }
-    }
-}
+
 task copyShaders(type:Copy) {
     from 'src/main/java/co/paralleluniverse/spaceships/render/shader'
     into 'build/classes/main/co/paralleluniverse/spaceships/render/shader'
@@ -53,6 +57,11 @@ task wrapper(type: Wrapper) {
 tasks.withType(JavaExec) {
     jvmArgs '-Xmx1024m'
     jvmArgs "-javaagent:${configurations.quasar.iterator().next()}" // =v, =d
+    jvmArgs '-ea'	    
+//    systemProperty "co.paralleluniverse.debugMode", "true"
+    systemProperty "co.paralleluniverse.globalFlightRecorder", "true"
+    systemProperty "co.paralleluniverse.flightRecorderDumpFile", "spaceships.log"
+    systemProperty "co.paralleluniverse.monitoring.flightRecorderSize","200000" 
 }
 
 defaultTasks 'build','run'

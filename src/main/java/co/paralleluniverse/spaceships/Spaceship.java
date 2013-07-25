@@ -115,7 +115,7 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
                     if (message instanceof Shot)
                         shot(((Shot) message).x, ((Shot) message).y);
                     else if (message instanceof Blast) {
-                        blast(((Shot) message).x, ((Shot) message).y);
+                        blast(((Blast) message).x, ((Blast) message).y);
                     }
                 } else if (nextMove - now <= 0) {
                     if (blowTime > 0) { // if i'm being being blown up

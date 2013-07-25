@@ -67,7 +67,6 @@ public class Spaceships {
     public final double speedVariance;
     public final boolean async;
     public final double range;
-    private final ForkJoinPool fjPool;
     private File metricsDir;
     private PrintStream configStream;
     private PrintStream timeStream;
@@ -93,7 +92,6 @@ public class Spaceships {
         println("N: " + N);
         println("Parallelism: " + parallelism);
 
-        this.fjPool = DbExecutors.parallel(parallelism);
         this.random = new RandSpatial();
 
         this.sb = initSpaceBase(props);
@@ -144,8 +142,6 @@ public class Spaceships {
         println();
 
         SpaceBaseBuilder builder = new SpaceBaseBuilder();
-
-        builder.setExecutor(fjPool);
 
         builder.setQueueBackpressure(1000);
 
