@@ -58,7 +58,7 @@ tasks.withType(JavaExec) {
     jvmArgs '-Xmx1024m'
     jvmArgs "-javaagent:${configurations.quasar.iterator().next()}" // =v, =d
     jvmArgs '-ea'	    
-//    systemProperty "co.paralleluniverse.debugMode", "true"
+    systemProperty "co.paralleluniverse.debugMode", "true"
     systemProperty "co.paralleluniverse.globalFlightRecorder", "true"
     systemProperty "co.paralleluniverse.flightRecorderDumpFile", "spaceships.log"
     systemProperty "co.paralleluniverse.monitoring.flightRecorderSize","200000" 

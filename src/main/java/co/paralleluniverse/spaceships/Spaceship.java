@@ -21,7 +21,7 @@ package co.paralleluniverse.spaceships;
 
 import co.paralleluniverse.actors.BasicActor;
 import co.paralleluniverse.actors.MailboxConfig;
-import co.paralleluniverse.db.api.Sync;
+import co.paralleluniverse.common.util.Debug;
 import co.paralleluniverse.fibers.SuspendExecution;
 import co.paralleluniverse.spacebase.AABB;
 import static co.paralleluniverse.spacebase.AABB.X;
@@ -33,14 +33,7 @@ import co.paralleluniverse.spacebase.SpatialQueries;
 import co.paralleluniverse.spacebase.SpatialToken;
 import co.paralleluniverse.spacebase.quasar.ResultSet;
 import co.paralleluniverse.strands.channels.Channels;
-import static java.lang.Math.atan2;
-import static java.lang.Math.cos;
-import static java.lang.Math.max;
-import static java.lang.Math.min;
-import static java.lang.Math.pow;
-import static java.lang.Math.sin;
-import static java.lang.Math.sqrt;
-import static java.lang.Math.toRadians;
+import static java.lang.Math.*;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
@@ -48,7 +41,7 @@ import java.util.concurrent.TimeUnit;
  * A spaceship
  */
 public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
-    private static final int MIN_PERIOD_MILLIS = 10;
+    private static final int MIN_PERIOD_MILLIS = 30;
     private static final int MAX_SEARCH_RANGE = 400;
     private static final int TIMES_HITTED_TO_BLOW = 3;
     private static final double REJECTION_COEFF = 80000.0;
@@ -67,7 +60,7 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
     private final Spaceships global;
     private final RandSpatial random;
     private SpatialToken token;
-    private Sync sync;
+    private final int id;
     //
     private long lastMoved = -1L;
     private long shotTime = 0;
@@ -88,8 +81,9 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
     private double exVx = 0;
     private double exVy = 0;
 
-    public Spaceship(Spaceships global) {
+    public Spaceship(Spaceships global, int id) {
         super(new MailboxConfig(10, Channels.OverflowPolicy.THROW));
+        this.id = id;
 
         this.global = global;
         this.random = global.random;
@@ -103,10 +97,16 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
     }
 
     @Override
+    public String toString() {
+        return "Spaceship@" + id + "{" + "shotTime:" + shotTime + " timesHit:" + timesHit + " x:" + x + " y:" + y + " vx:" + vx + " vy:" + vy + " timeShot:" + timeShot + '}';
+    }
+
+    @Override
     protected Void doRun() throws InterruptedException, SuspendExecution {
         this.token = global.sb.insert(this, getAABB());
         try {
-            for (;;) {
+            record(1, "Spaceship", "doRun", "%s: aaaaa", this);
+            for (int i = 0;; i++) {
                 final long nextMove = lastMoved + MIN_PERIOD_MILLIS;
 
                 SpaceshipMessage message = receive(nextMove - now(), TimeUnit.MILLISECONDS);
@@ -119,13 +119,13 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
                     }
                 } else if (nextMove - now <= 0) {
                     if (blowTime > 0) { // if i'm being being blown up
-                        debug("blow");
+                        record(1, "Spaceship", "doRun", "%s: blow", this);
                         if (global.now() - blowTime > BLOW_TILL_DELETE_DURATION)
                             return null; // explosion has finished
                     }
 
                     if (lockedOn == null) {
-                        debug("no lock");
+                        record(1, "Spaceship", "doRun", "%s: no lock", this);
                         if (now - getTimeShot() > SHOOT_INABILITY_DURATION && random.nextFloat() < SEARCH_PROBABLITY)
                             searchForTargets();
                     } else
@@ -146,20 +146,24 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
                         }
                     }
                 }
+                record(1, "Spaceship", "doRun", "%s: iter %s", this, i);
             }
+        } catch(Exception e) {
+            e.printStackTrace();
+            Debug.exit(1);
+            return null;
         } finally {
+            record(1, "Spaceship", "doRun", "%s: XXXXXX", this);
             global.sb.delete(token);
         }
     }
 
     private void searchForTargets() throws SuspendExecution, InterruptedException {
-        double v = sqrt(pow(vx, 2) + pow(vy, 2));
-        final double x2 = x + vx / v * MAX_SEARCH_RANGE;
-        final double y2 = y + vy / v * MAX_SEARCH_RANGE;
-        debug("searching...");
+//        double v = sqrt(pow(vx, 2) + pow(vy, 2));
+//        final double x2 = x + vx / v * MAX_SEARCH_RANGE;
+//        final double y2 = y + vy / v * MAX_SEARCH_RANGE;
+        record(1, "Spaceship", "searchForTargets", "%s: searching...", this);
 
-        // search for targets in the line of shot
-//        global.sb.query(new LineDistanceQuery<Spaceship>(x + 1, x2, y + 1, y2), new SpatialSetVisitor<Spaceship>() {
         try (ResultSet<Spaceship> rs = global.sb.query(new RadarQuery(x, y, vx, vy, toRadians(30), MAX_SEARCH_RANGE))) {
             Spaceship nearestShip = null;
             double minRange2 = pow(MAX_SEARCH_RANGE, 2);
@@ -172,12 +176,12 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
             }
             if (nearestShip != null)
                 lockOnTarget(nearestShip);
-            debug("size of radar query " + rs.getResultReadOnly().size());
+            record(1, "Spaceship", "searchForTargets", "%s: size of radar query: %d", this, rs.getResultReadOnly().size());
         }
     }
 
     private void chaseAndShoot() throws SuspendExecution, InterruptedException {
-        debug("locked");
+        record(1, "Spaceship", "chaseAndShoot", "%s: locked", this);
         // check lock range, chase, shoot
         boolean foundLockedOn = false;
         ElementAndBounds<Spaceship> target = global.sb.getElement(lockedOn);
@@ -191,17 +195,17 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
                 return;
             }
             if (inShotRange(target.getBounds()) & global.random.nextGaussian() < SHOOT_PROBABLITY) {
-                debug("shootrange");
+                record(1, "Spaceship", "chaseAndShoot", "%s: shootrange", this);
                 double range = mag(lockedSpaceship.x - x, lockedSpaceship.y - y);
                 this.shoot(range);
                 lockedSpaceship.send(new Shot(x, y));
             }
             if (inLockRange(target.getBounds())) {
-                debug("lockrange");
+                record(1, "Spaceship", "chaseAndShoot", "%s: lockrange", this);
 //              shoot(global, range);
                 chase(target.getBounds());
             } else {
-                debug("release lock");
+                record(1, "Spaceship", "chaseAndShoot", "%s: release lock", this);
                 lockOnTarget(null);  // not in range, release lock
             }
         }
@@ -349,6 +353,7 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
      * @param shooter
      */
     private void shot(double shooterX, double shooterY) throws SuspendExecution, InterruptedException {
+        record(1, "Spaceship", "shot", "%s: shot", this);
         this.timesHit++;
         this.timeShot = global.now();
         if (timesHit < TIMES_HITTED_TO_BLOW) {
@@ -365,6 +370,8 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
             exVy += HIT_RECOIL_VELOCITY * udy;
             this.exVelocityUpdated = timeShot;
         } else if (blowTime == 0) {
+            System.out.println("BOOM: " + this);
+            record(1, "Spaceship", "shot", "%s: BOOM", this);
             // I'm dead: blow up. The explosion pushes away all nearby ships.
             try (ResultSet<Spaceship> rs = global.sb.query(SpatialQueries.range(getAABB(), BLAST_RANGE))) {
                 final Blast blastMessage = new Blast(now(), x, y);
@@ -426,10 +433,6 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
             lockedOn = null;
     }
 
-    public void setSync(Sync sync) {
-        this.sync = sync;
-    }
-
     private void shoot(double range) {
         shotTime = global.now();
         shotLength = range;
@@ -478,12 +481,6 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
 
     public long getShotTime() {
         return shotTime;
-    }
-
-    private void debug(String s) {
-//        if(global.getShips().get(0)==this) {
-//            System.out.println(s);
-//        }
     }
 
     static class SpaceshipMessage {

@@ -20,6 +20,7 @@
 package co.paralleluniverse.spaceships;
 
 import co.paralleluniverse.common.monitoring.Metrics;
+import co.paralleluniverse.common.util.Debug;
 import co.paralleluniverse.fibers.Fiber;
 import co.paralleluniverse.spacebase.AABB;
 import co.paralleluniverse.spacebase.quasar.SpaceBase;
@@ -172,7 +173,7 @@ public class Spaceships {
     private void run() throws Exception {
         Spaceship[] ships = new Spaceship[N];
         for (int i = 0; i < N; i++) {
-            Spaceship s = new Spaceship(this);
+            Spaceship s = new Spaceship(this, i);
             Fiber f = new Fiber(s);
             f.start();
             ships[i] = s;
@@ -180,7 +181,7 @@ public class Spaceships {
 
         Thread.sleep(3000);
         port = new GLPort(toolkit, N, Spaceships.this, bounds);
-
+        
         for(Spaceship s : ships)
             s.join();
         

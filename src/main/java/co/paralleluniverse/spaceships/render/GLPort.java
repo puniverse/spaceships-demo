@@ -151,7 +151,7 @@ public class GLPort implements GLEventListener {
         }
 
         drawable.addGLEventListener(this);
-        animator = new FPSAnimator(drawable, 60);
+        animator = new FPSAnimator(drawable, 50);
 
         if (TOOLKIT == Toolkit.NEWT) {
             final GLWindow window = (GLWindow) drawable;
@@ -283,9 +283,9 @@ public class GLPort implements GLEventListener {
     }
 
     private Collection<Spaceship> query(SpatialQuery<? super Spaceship> query) {
-        System.out.println("qqqq 1111");
+//        System.out.println("qqqq 1111");
         final Collection<Spaceship> ss = sb.query(query);
-        System.out.println("qqqq 2222");
+//        System.out.println("qqqq 2222");
         return ss;
     }
 
@@ -313,10 +313,10 @@ public class GLPort implements GLEventListener {
         MutableAABB currentPort = getCurrentPort(ct);
         portToMvMatrix(currentPort);
         double margins = WIDTH_MARGINS;
-        if (ct - lastSBQueryTime > SB_QUERY_RATE) {
-            lastSBQueryTime = ct;
+//        if (ct - lastSBQueryTime > SB_QUERY_RATE) {
+//            lastSBQueryTime = ct;
             lastSBQueryResult = query(SpatialQueries.contained(AABB.create(currentPort.min(X) - margins, currentPort.max(X) + margins, currentPort.min(Y) - margins, currentPort.max(Y) + margins)));
-        }
+//        }
         double[] pos;
         int countInPort = 0;
         for (final Spaceship s : lastSBQueryResult) {
