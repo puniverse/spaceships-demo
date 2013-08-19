@@ -19,6 +19,8 @@
  */
 package co.paralleluniverse.spaceships;
 
+import co.paralleluniverse.actors.ActorRef;
+import co.paralleluniverse.actors.LocalActorUtil;
 import co.paralleluniverse.common.monitoring.Metrics;
 import co.paralleluniverse.common.util.Debug;
 import co.paralleluniverse.fibers.Fiber;
@@ -173,19 +175,16 @@ public class Spaceships {
      * Main loop: loops over all spaceships and initiates each spaceship's actions. Simulates an IO thread receiving commands over the net.
      */
     private void run() throws Exception {
-        Spaceship[] ships = new Spaceship[N];
+        ActorRef<Spaceship.SpaceshipMessage>[] ships = new ActorRef[N];
         for (int i = 0; i < N; i++) {
-            Spaceship s = new Spaceship(this, i);
-            Fiber f = new Fiber(s);
-            f.start();
-            ships[i] = s;
+            ships[i] = new Spaceship(this, i).spawn();
         }
 
         Thread.sleep(3000);
         port = new GLPort(toolkit, N, Spaceships.this, bounds);
         
-        for(Spaceship s : ships)
-            s.join();
+        for(ActorRef<Spaceship.SpaceshipMessage> s : ships)
+            LocalActorUtil.join(s);
         
 //        long initTime = System.nanoTime();
 //

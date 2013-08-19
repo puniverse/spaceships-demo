@@ -243,12 +243,12 @@ public class GLPort implements GLEventListener {
 
         drawableWidth = drawable.getWidth();
         drawableHeight = drawable.getHeight();
-        port.min(LX, -drawable.getWidth() / 2);
-        port.max(LX, drawable.getWidth() / 2);
-        port.min(LY, -drawable.getHeight() / 2);
-        port.max(LY, drawable.getHeight() / 2);
+        port.min(X, -drawable.getWidth() / 2);
+        port.max(X, drawable.getWidth() / 2);
+        port.min(Y, -drawable.getHeight() / 2);
+        port.max(Y, drawable.getHeight() / 2);
         //gl.glEnable(gl.GL_VERTEX_PROGRAM_POINT_SIZE);
-        gl.glViewport(0, 0, (int) (port.max(LX) - port.min(LX)), (int) (port.max(LY) - port.min(LY)));
+        gl.glViewport(0, 0, (int) (port.max(X) - port.min(X)), (int) (port.max(Y) - port.min(Y)));
         gl.glClearColor(0, 0, 0, 1);
         gl.glEnable(GL.GL_BLEND);
         gl.glBlendFunc(GL.GL_ONE, GL.GL_ONE_MINUS_SRC_ALPHA);
@@ -292,8 +292,8 @@ public class GLPort implements GLEventListener {
     private void portToMvMatrix(MutableAABB cp) {
         pmv.glMatrixMode(GLMatrixFunc.GL_MODELVIEW);
         pmv.glLoadIdentity();
-        pmv.glScalef((float) (2.0 / (cp.max(LX) - cp.min(LX))), (float) (2.0 / (cp.max(LY) - cp.min(LY))), 1.0f);
-        pmv.glTranslatef((float) (-(cp.max(LX) + cp.min(LX)) / 2.0), (float) (-(cp.max(LY) + cp.min(LY)) / 2.0), 0f);
+        pmv.glScalef((float) (2.0 / (cp.max(X) - cp.min(X))), (float) (2.0 / (cp.max(Y) - cp.min(Y))), 1.0f);
+        pmv.glTranslatef((float) (-(cp.max(X) + cp.min(X)) / 2.0), (float) (-(cp.max(Y) + cp.min(Y)) / 2.0), 0f);
     }
 
     @Override
@@ -332,7 +332,7 @@ public class GLPort implements GLEventListener {
 
         final int n;
 //        if (now - lastQueryTime > SB_QUERY_RATE) {
-        n = query(now, SpatialQueries.contained(AABB.create(currentPort.min(LX) - margins, currentPort.max(LX) + margins, currentPort.min(LY) - margins, currentPort.max(LY) + margins)));
+        n = query(now, SpatialQueries.contained(AABB.create(currentPort.min(X) - margins, currentPort.max(X) + margins, currentPort.min(Y) - margins, currentPort.max(Y) + margins)));
         lastQueryTime = now;
 //        } else
 //            n = extrapolate(now);
@@ -342,8 +342,6 @@ public class GLPort implements GLEventListener {
         for (int i = 0; i < n; i++) {
             Spaceship.State s = ships[i];
             s.getCurrentLocation(now, verticesb);
-            verticesb.put((float) getDataDouble(i, LX));
-            verticesb.put((float) getDataDouble(i, LY));
 
             if (s.getBlowTime() > 0)  // 0.01 - start blow animation, 1.0 - end of animation
                 colorsb.put(Math.min(1.0f, (now - s.getBlowTime()) / EXPLOSION_DURATION));
@@ -357,7 +355,7 @@ public class GLPort implements GLEventListener {
             if (portContains(i))
                 countInPort++;
         }
-        setTitle("" + countInPort + " Spaceships " + (int) (port.max(LX) - port.min(LX)) + "x" + (int) (port.max(LY) - port.min(LY)));
+        setTitle("" + countInPort + " Spaceships " + (int) (port.max(X) - port.min(X)) + "x" + (int) (port.max(Y) - port.min(Y)));
 
         vertices.flip();
         colors.flip();
@@ -380,8 +378,8 @@ public class GLPort implements GLEventListener {
         final GL2ES2 gl = drawable.getGL().getGL2ES2();
 
         gl.glViewport(0, 0, width, height);
-        port.max(LX, port.min(LX) + (double) width / drawableWidth * (port.max(LX) - port.min(LX)));
-        port.max(LY, port.min(LY) + (double) height / drawableHeight * (port.max(LY) - port.min(LY)));
+        port.max(X, port.min(X) + (double) width / drawableWidth * (port.max(X) - port.min(X)));
+        port.max(Y, port.min(Y) + (double) height / drawableHeight * (port.max(Y) - port.min(Y)));
         drawableHeight = height;
         drawableWidth = width;
         portToMvMatrix(port);
@@ -497,13 +495,13 @@ public class GLPort implements GLEventListener {
         final long ct = System.currentTimeMillis();
         fixPort(ct, false);
 
-        final double width = port.max(LX) - port.min(LX);
-        final double height = port.max(LY) - port.min(LY);
+        final double width = port.max(X) - port.min(X);
+        final double height = port.max(Y) - port.min(Y);
 
         double moveStep = units * KEY_PRESS_TRANSLATE;
 
         if (horizontal) {
-            int dim = LX;
+            int dim = X;
             if (port.min(dim) + portMinXAnimation + moveStep < bounds.min(dim)) {
                 moveStep = bounds.min(dim) - port.min(dim);
             } else if (port.max(dim) + portMaxXAnimation + moveStep > bounds.max(dim)) {
@@ -512,7 +510,7 @@ public class GLPort implements GLEventListener {
             portMinXAnimation += moveStep;
             portMaxXAnimation += moveStep;
         } else {
-            int dim = LY;
+            int dim = Y;
             if (port.min(dim) + portMinYAnimation + moveStep < bounds.min(dim)) {
                 moveStep = bounds.min(dim) - port.min(dim);
             } else if (port.max(dim) + portMaxYAnimation + moveStep > bounds.max(dim)) {
@@ -526,8 +524,8 @@ public class GLPort implements GLEventListener {
     private void scalePort(double units) {
         final long ct = System.currentTimeMillis();
         fixPort(ct, false);
-        final double width = port.max(LX) - port.min(LX);
-        final double height = port.max(LY) - port.min(LY);
+        final double width = port.max(X) - port.min(X);
+        final double height = port.max(Y) - port.min(Y);
         final double ratio = height / width;
         final double widthToAdd = width * ZOOM_UNIT * units;
         final double heightToAdd = width * ZOOM_UNIT * units * ratio;
@@ -541,10 +539,10 @@ public class GLPort implements GLEventListener {
                 portMinYAnimation -= heightToAdd;
             }
         } else { // zoomout
-            if ((bounds.min(LX) < port.min(LX) + portMinXAnimation - widthToAdd)
-                    & (bounds.min(LY) < port.min(LY) + portMinYAnimation - heightToAdd)
-                    & (bounds.max(LX) > port.max(LX) + portMaxXAnimation + widthToAdd)
-                    & (bounds.max(LY) > port.max(LY) + portMaxYAnimation + heightToAdd)) {
+            if ((bounds.min(X) < port.min(X) + portMinXAnimation - widthToAdd)
+                    & (bounds.min(Y) < port.min(Y) + portMinYAnimation - heightToAdd)
+                    & (bounds.max(X) > port.max(X) + portMaxXAnimation + widthToAdd)
+                    & (bounds.max(Y) > port.max(Y) + portMaxYAnimation + heightToAdd)) {
                 portMaxXAnimation += widthToAdd;
                 portMinXAnimation -= widthToAdd;
                 portMaxYAnimation += heightToAdd;
@@ -557,28 +555,28 @@ public class GLPort implements GLEventListener {
         if (portMaxXAnimation == 0)
             return port;
         MutableAABB currentPort = MutableAABB.create(2);
-        final double width = port.max(LX) - port.min(LX);
-        final double height = port.max(LY) - port.min(LY);
+        final double width = port.max(X) - port.min(X);
+        final double height = port.max(Y) - port.min(Y);
         final double ratio = height / width;
         double animation = Math.min(1.0, (double) (ct - portAnimationStartTime) / ANIMATION_DURATION);
-        currentPort.min(LX, port.min(LX) + animation * portMinXAnimation);
-        currentPort.min(LY, port.min(LY) + animation * portMinYAnimation);
-        currentPort.max(LX, port.max(LX) + animation * portMaxXAnimation);
-        currentPort.max(LY, port.max(LY) + animation * portMaxYAnimation);
+        currentPort.min(X, port.min(X) + animation * portMinXAnimation);
+        currentPort.min(Y, port.min(Y) + animation * portMinYAnimation);
+        currentPort.max(X, port.max(X) + animation * portMaxXAnimation);
+        currentPort.max(Y, port.max(Y) + animation * portMaxYAnimation);
         return currentPort;
     }
 
     private void fixPort(final long ct, boolean onlyIfFinished) {
-        final double width = port.max(LX) - port.min(LX);
-        final double height = port.max(LY) - port.min(LY);
+        final double width = port.max(X) - port.min(X);
+        final double height = port.max(Y) - port.min(Y);
         final double ratio = height / width;
         double animation = Math.min(1.0, (double) (ct - portAnimationStartTime) / ANIMATION_DURATION);
         if (onlyIfFinished & animation < 1.0)
             return;
-        port.min(LX, port.min(LX) + animation * portMinXAnimation);
-        port.min(LY, port.min(LY) + animation * portMinYAnimation);
-        port.max(LX, port.max(LX) + animation * portMaxXAnimation);
-        port.max(LY, port.max(LY) + animation * portMaxYAnimation);
+        port.min(X, port.min(X) + animation * portMinXAnimation);
+        port.min(Y, port.min(Y) + animation * portMinYAnimation);
+        port.max(X, port.max(X) + animation * portMaxXAnimation);
+        port.max(Y, port.max(Y) + animation * portMaxYAnimation);
         portMaxXAnimation -= animation * portMaxXAnimation;
         portMinXAnimation -= animation * portMinXAnimation;
         portMaxYAnimation -= animation * portMaxYAnimation;

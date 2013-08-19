@@ -33,6 +33,7 @@ import co.paralleluniverse.spacebase.ElementUpdater;
 import co.paralleluniverse.spacebase.MutableAABB;
 import co.paralleluniverse.spacebase.SpatialQueries;
 import co.paralleluniverse.spacebase.SpatialToken;
+import co.paralleluniverse.spacebase.quasar.ElementUpdater1;
 import co.paralleluniverse.spacebase.quasar.ResultSet;
 import co.paralleluniverse.strands.channels.Channels;
 import static java.lang.Math.*;
@@ -88,7 +89,7 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
     // Therefore the owning spaceship can read it any time, but anyone else (other spacehips or the renderer) must only do so in
     // a transaction.
     public static class State {
-        final ActorRef<SpaceshipMessage> spaceship;
+        private ActorRef<SpaceshipMessage> spaceship;
         private SpatialToken token;
         Status status = Status.ALIVE;
         private long lastMoved = -1L;
@@ -104,10 +105,6 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
         private long blowTime = 0;
         private double shotLength = 10f;
         private int timesHit = 0;
-
-        private State(ActorRef<SpaceshipMessage> spaceship) {
-            this.spaceship = spaceship;
-        }
 
         public AABB getAABB() {
             final MutableAABB aabb = AABB.create(2);
@@ -234,7 +231,7 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
     public Spaceship(Spaceships global, int id) {
         super(new MailboxConfig(10, Channels.OverflowPolicy.THROW));
         this.id = id;
-        this.state = new State(ref());
+        this.state = new State();
 
         this.global = global;
         this.random = global.random;
@@ -254,7 +251,8 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
 
     @Override
     protected Void doRun() throws InterruptedException, SuspendExecution {
-        this.state.token = global.sb.insert(this.state, state.getAABB());
+        state.spaceship = ref();
+        state.token = global.sb.insert(this.state, state.getAABB());
         try {
             record(1, "Spaceship", "doRun", "%s: aaaaa", this);
             for (int i = 0;; i++) {
@@ -303,6 +301,16 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
                             }
                         }
                         reduceExternalVelocity(now);
+                    } else if (status == Status.BLOWING_UP && state.status != status) {
+                        try (ElementUpdater1<State> up = global.sb.update(state.token)) {
+                            state.status = status;
+                            state.vx = 0.0;
+                            state.vy = 0.0;
+                            state.exVx = 0.0;
+                            state.exVy = 0.0;
+                            state.ax = 0.0;
+                            state.ay = 0.0;
+                        }
                     }
                 }
                 record(1, "Spaceship", "doRun", "%s: iter %s", this, i);
