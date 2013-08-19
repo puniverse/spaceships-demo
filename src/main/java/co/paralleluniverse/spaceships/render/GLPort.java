@@ -23,9 +23,11 @@ import co.paralleluniverse.spacebase.AABB;
 import static co.paralleluniverse.spacebase.AABB.X;
 import static co.paralleluniverse.spacebase.AABB.Y;
 import co.paralleluniverse.spacebase.MutableAABB;
+import co.paralleluniverse.spacebase.SpaceBase;
 import co.paralleluniverse.spacebase.SpatialQueries;
 import co.paralleluniverse.spacebase.SpatialQuery;
-import co.paralleluniverse.spacebase.simple.SimpleSpaceBase;
+import co.paralleluniverse.spacebase.SpatialToken;
+import co.paralleluniverse.spacebase.SpatialVisitor;
 import co.paralleluniverse.spaceships.Spaceship;
 import co.paralleluniverse.spaceships.Spaceships;
 import com.jogamp.newt.awt.NewtCanvasAWT;
@@ -40,7 +42,9 @@ import java.awt.Component;
 import java.awt.Frame;
 import java.io.IOException;
 import java.nio.FloatBuffer;
-import java.util.Collection;
+import java.util.Arrays;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import javax.media.opengl.DebugGL3;
 import javax.media.opengl.GL;
 import javax.media.opengl.GL2ES2;
@@ -78,8 +82,20 @@ public class GLPort implements GLEventListener {
     public static final int MAX_PORT_WIDTH = 400;
     public static final String WINDOW_TITLE = "Spaceships";
     //
-    private long lastSBQueryTime = 0;
-    private Collection<Spaceship> lastSBQueryResult = null;
+    private static final int ITEM_SIZE = 12;
+    private static final int LAST_MOVED = 0;
+    private static final int LX = 1;
+    private static final int LY = 2;
+    private static final int VX = 3;
+    private static final int VY = 4;
+    private static final int EVX = 5;
+    private static final int EVY = 6;
+    private static final int AX = 7;
+    private static final int AY = 8;
+    private static final int SHOT_TIME = 9;
+    private static final int BLOW_TIME = 10;
+    private static final int SHOT_LENGTH = 11;
+    //
     private Texture spaceshipTex;
     private Texture explosionTex;
     private ShaderProgram shaderProgram;
@@ -95,7 +111,7 @@ public class GLPort implements GLEventListener {
     private static final float KEY_PRESS_TRANSLATE = 10.0f;
     private final Object window;
     private final int maxItems;
-    private final SimpleSpaceBase<Spaceship> sb;
+    private final SpaceBase<Spaceship.State> sb;
     private final AABB bounds;
     private MutableAABB port = MutableAABB.create(2);
     private ProgramState shaderState;
@@ -103,9 +119,13 @@ public class GLPort implements GLEventListener {
     private VBO vertices;
     private VBO colors;
     private PMVMatrix pmv = new PMVMatrix();
-    private float x = 1.0f;
     private final FPSAnimator animator;
     private final Spaceships global;
+    private long lastQueryTime = 0;
+    private long lastDispTime = 0;
+    private final AtomicInteger indexGen = new AtomicInteger();
+    private final Spaceship.State[] ships;
+    private final long[] data;
 
     static {
         GLProfile.initSingleton();
@@ -115,8 +135,11 @@ public class GLPort implements GLEventListener {
         TOOLKIT = toolkit;
         this.maxItems = maxItems;
         this.global = global;
-        this.sb = new SimpleSpaceBase<Spaceship>(global.getPlainSpaceBase());
+        this.sb = global.getPlainSpaceBase();
         this.bounds = bounds;
+
+        this.data = new long[maxItems * ITEM_SIZE];
+        this.ships = new Spaceship.State[maxItems];
 
         final GLProfile glp = GLProfile.get(GLProfile.GL3);
         final GLCapabilitiesImmutable glcaps = (GLCapabilitiesImmutable) new GLCapabilities(glp);
@@ -220,12 +243,12 @@ public class GLPort implements GLEventListener {
 
         drawableWidth = drawable.getWidth();
         drawableHeight = drawable.getHeight();
-        port.min(X, -drawable.getWidth() / 2);
-        port.max(X, drawable.getWidth() / 2);
-        port.min(Y, -drawable.getHeight() / 2);
-        port.max(Y, drawable.getHeight() / 2);
+        port.min(LX, -drawable.getWidth() / 2);
+        port.max(LX, drawable.getWidth() / 2);
+        port.min(LY, -drawable.getHeight() / 2);
+        port.max(LY, drawable.getHeight() / 2);
         //gl.glEnable(gl.GL_VERTEX_PROGRAM_POINT_SIZE);
-        gl.glViewport(0, 0, (int) (port.max(X) - port.min(X)), (int) (port.max(Y) - port.min(Y)));
+        gl.glViewport(0, 0, (int) (port.max(LX) - port.min(LX)), (int) (port.max(LY) - port.min(LY)));
         gl.glClearColor(0, 0, 0, 1);
         gl.glEnable(GL.GL_BLEND);
         gl.glBlendFunc(GL.GL_ONE, GL.GL_ONE_MINUS_SRC_ALPHA);
@@ -269,8 +292,8 @@ public class GLPort implements GLEventListener {
     private void portToMvMatrix(MutableAABB cp) {
         pmv.glMatrixMode(GLMatrixFunc.GL_MODELVIEW);
         pmv.glLoadIdentity();
-        pmv.glScalef((float) (2.0 / (cp.max(X) - cp.min(X))), (float) (2.0 / (cp.max(Y) - cp.min(Y))), 1.0f);
-        pmv.glTranslatef((float) (-(cp.max(X) + cp.min(X)) / 2.0), (float) (-(cp.max(Y) + cp.min(Y)) / 2.0), 0f);
+        pmv.glScalef((float) (2.0 / (cp.max(LX) - cp.min(LX))), (float) (2.0 / (cp.max(LY) - cp.min(LY))), 1.0f);
+        pmv.glTranslatef((float) (-(cp.max(LX) + cp.min(LX)) / 2.0), (float) (-(cp.max(LY) + cp.min(LY)) / 2.0), 0f);
     }
 
     @Override
@@ -280,13 +303,6 @@ public class GLPort implements GLEventListener {
         shaderState.bind(gl);
         shaderState.destroy(gl);
         vertices.destroy(gl);
-    }
-
-    private Collection<Spaceship> query(SpatialQuery<? super Spaceship> query) {
-//        System.out.println("qqqq 1111");
-        final Collection<Spaceship> ss = sb.query(query);
-//        System.out.println("qqqq 2222");
-        return ss;
     }
 
     @Override
@@ -308,43 +324,40 @@ public class GLPort implements GLEventListener {
         colors.clear();
         final FloatBuffer verticesb = (FloatBuffer) vertices.getBuffer();
         final FloatBuffer colorsb = (FloatBuffer) colors.getBuffer();
-        long ct = System.currentTimeMillis();
-        fixPort(ct, true);
-        MutableAABB currentPort = getCurrentPort(ct);
+        long now = global.now();
+        fixPort(now, true);
+        MutableAABB currentPort = getCurrentPort(now);
         portToMvMatrix(currentPort);
         double margins = WIDTH_MARGINS;
-//        if (ct - lastSBQueryTime > SB_QUERY_RATE) {
-//            lastSBQueryTime = ct;
-            lastSBQueryResult = query(SpatialQueries.contained(AABB.create(currentPort.min(X) - margins, currentPort.max(X) + margins, currentPort.min(Y) - margins, currentPort.max(Y) + margins)));
-//        }
-        double[] pos;
+
+        final int n;
+//        if (now - lastQueryTime > SB_QUERY_RATE) {
+        n = query(now, SpatialQueries.contained(AABB.create(currentPort.min(LX) - margins, currentPort.max(LX) + margins, currentPort.min(LY) - margins, currentPort.max(LY) + margins)));
+        lastQueryTime = now;
+//        } else
+//            n = extrapolate(now);
+        lastDispTime = now;
+
         int countInPort = 0;
-        for (final Spaceship s : lastSBQueryResult) {
-            if (s.getLastMoved() > 0) {
-                long exrapolationTime;
+        for (int i = 0; i < n; i++) {
+            Spaceship.State s = ships[i];
+            s.getCurrentLocation(now, verticesb);
+            verticesb.put((float) getDataDouble(i, LX));
+            verticesb.put((float) getDataDouble(i, LY));
 
-                if (global.extrapolate)
-                    // don't extrapolate spaceships that have npt been moved a long time
-                    exrapolationTime = Math.min(ct, s.getLastMoved() + MAX_EXTRAPOLATION_DURATION);
-                else
-                    exrapolationTime = s.getLastMoved();
-                pos = s.getCurrentPosition(exrapolationTime);
-                verticesb.put((float) pos[0]);
-                verticesb.put((float) pos[1]);
+            if (s.getBlowTime() > 0)  // 0.01 - start blow animation, 1.0 - end of animation
+                colorsb.put(Math.min(1.0f, (now - s.getBlowTime()) / EXPLOSION_DURATION));
+            else
+                colorsb.put(0); // ship isn't blowing up
+            colorsb.put((float) s.getCurrentHeading(now));
 
-                if (s.getBlowTime() > 0) { // 0.01 - start blow animation, 1.0 - end od animation
-                    colorsb.put(Math.min(1.0f, (ct - s.getBlowTime()) / EXPLOSION_DURATION));
-                } else
-                    colorsb.put(0); // regular ship without blow
-                colorsb.put((float) s.getCurrentHeading(exrapolationTime));
+            // put the shotLength (0 for ship that's not firing)
+            colorsb.put(now - s.getTimeFired() < SHOOT_DURATION ? (float) s.getShotLength() : 0f);
 
-                // put the shootLength (0 for ship wihout shoot)
-                colorsb.put(ct - s.getShotTime() < SHOOT_DURATION ? (float) s.getShotLength() : 0f);
-            }
-            if (port.contains(s.getAABB()))
+            if (portContains(i))
                 countInPort++;
         }
-        setTitle("" + countInPort + " Spaceships " + (int) (port.max(X) - port.min(X)) + "x" + (int) (port.max(Y) - port.min(Y)));
+        setTitle("" + countInPort + " Spaceships " + (int) (port.max(LX) - port.min(LX)) + "x" + (int) (port.max(LY) - port.min(LY)));
 
         vertices.flip();
         colors.flip();
@@ -367,11 +380,116 @@ public class GLPort implements GLEventListener {
         final GL2ES2 gl = drawable.getGL().getGL2ES2();
 
         gl.glViewport(0, 0, width, height);
-        port.max(X, port.min(X) + (double) width / drawableWidth * (port.max(X) - port.min(X)));
-        port.max(Y, port.min(Y) + (double) height / drawableHeight * (port.max(Y) - port.min(Y)));
+        port.max(LX, port.min(LX) + (double) width / drawableWidth * (port.max(LX) - port.min(LX)));
+        port.max(LY, port.min(LY) + (double) height / drawableHeight * (port.max(LY) - port.min(LY)));
         drawableHeight = height;
         drawableWidth = width;
         portToMvMatrix(port);
+    }
+
+    private int query(final long currentTime, SpatialQuery<? super Spaceship.State> query) {
+        final int lastCount = indexGen.get();
+        indexGen.set(0);
+
+        sb.query(query, new SpatialVisitor<Spaceship.State>() {
+            @Override
+            public void visit(Spaceship.State s, SpatialToken st) {
+                if (s.getLastMoved() == 0)
+                    return;
+
+                final int index = indexGen.getAndIncrement();
+                ships[index] = s;
+                //s.getCurrentData(currentTime, data, getDataIndex(index, 0));
+            }
+
+            @Override
+            public void done() {
+            }
+        });
+        final int count = indexGen.get();
+
+        if (count < lastCount) {
+            // clear arrays
+            Arrays.fill(ships, count, lastCount, null);
+            Arrays.fill(data, count * ITEM_SIZE, lastCount * ITEM_SIZE, 0);
+        }
+        return count;
+    }
+
+    private int extrapolate(final long currentTime) {
+        final int count = indexGen.get();
+        double duration = (double) (currentTime - lastDispTime) / TimeUnit.SECONDS.toMillis(1);
+        double duration2 = duration * duration;
+
+        for (int i = 0; i < count; i++) {
+            double x = getDataDouble(i, LX);
+            double y = getDataDouble(i, LY);
+            double vx = getDataDouble(i, VX);
+            double vy = getDataDouble(i, VY);
+            double ax = getDataDouble(i, AX);
+            double ay = getDataDouble(i, AY);
+
+            x = x + vx * duration + ax * duration2;
+            y = y + vy * duration + ay * duration2;
+            vx = vx + ax * duration;
+            vy = vy + ay * duration;
+
+            setDataDouble(i, LX, x);
+            setDataDouble(i, LY, y);
+            setDataDouble(i, VX, vx);
+            setDataDouble(i, VY, vy);
+        }
+        return count;
+    }
+
+    private void copy(int index, Spaceship.State state) {
+        setDataLong(index, LAST_MOVED, state.getLastMoved());
+        setDataDouble(index, LX, state.getX());
+        setDataDouble(index, LY, state.getY());
+        setDataDouble(index, VX, state.getVx());
+        setDataDouble(index, VY, state.getVy());
+        setDataDouble(index, EVX, state.getExVx());
+        setDataDouble(index, EVY, state.getExVy());
+        setDataDouble(index, AX, state.getAx());
+        setDataDouble(index, AY, state.getAy());
+        setDataLong(index, SHOT_TIME, state.getTimeFired());
+        setDataLong(index, BLOW_TIME, state.getBlowTime());
+        setDataDouble(index, SHOT_LENGTH, state.getShotLength());
+    }
+
+    private boolean portContains(int index) {
+        final double x = data[getDataIndex(index, LX)];
+        final double y = data[getDataIndex(index, LY)];
+        return x >= port.min(X) && x <= port.max(X)
+                && y >= port.min(Y) && y <= port.max(Y);
+    }
+
+    private int getDataIndex(int index, int offset) {
+        return index * ITEM_SIZE + offset;
+    }
+
+    private void setDataLong(int index, int offset, long val) {
+        data[index * ITEM_SIZE + offset] = val;
+    }
+
+    private long getDataLong(int index, int offset) {
+        return data[index * ITEM_SIZE + offset];
+    }
+
+    private void setDataDouble(int index, int offset, double val) {
+        setDataLong(index, offset, Double.doubleToRawLongBits(val));
+        //data[index * ITEM_SIZE + offset] = val;
+    }
+
+    private double getDataDouble(int index, int offset) {
+        return Double.longBitsToDouble(getDataLong(index, offset));
+        //return data[index * ITEM_SIZE + offset];
+    }
+
+    public double getHeading(int index) {
+        final double vx = getDataDouble(index, VX);
+        final double vy = getDataDouble(index, VY);
+        return Math.atan2(vx, vy);
     }
 
     private void movePort(boolean horizontal, double units) {
@@ -379,13 +497,13 @@ public class GLPort implements GLEventListener {
         final long ct = System.currentTimeMillis();
         fixPort(ct, false);
 
-        final double width = port.max(X) - port.min(X);
-        final double height = port.max(Y) - port.min(Y);
+        final double width = port.max(LX) - port.min(LX);
+        final double height = port.max(LY) - port.min(LY);
 
         double moveStep = units * KEY_PRESS_TRANSLATE;
 
         if (horizontal) {
-            int dim = X;
+            int dim = LX;
             if (port.min(dim) + portMinXAnimation + moveStep < bounds.min(dim)) {
                 moveStep = bounds.min(dim) - port.min(dim);
             } else if (port.max(dim) + portMaxXAnimation + moveStep > bounds.max(dim)) {
@@ -394,7 +512,7 @@ public class GLPort implements GLEventListener {
             portMinXAnimation += moveStep;
             portMaxXAnimation += moveStep;
         } else {
-            int dim = Y;
+            int dim = LY;
             if (port.min(dim) + portMinYAnimation + moveStep < bounds.min(dim)) {
                 moveStep = bounds.min(dim) - port.min(dim);
             } else if (port.max(dim) + portMaxYAnimation + moveStep > bounds.max(dim)) {
@@ -408,8 +526,8 @@ public class GLPort implements GLEventListener {
     private void scalePort(double units) {
         final long ct = System.currentTimeMillis();
         fixPort(ct, false);
-        final double width = port.max(X) - port.min(X);
-        final double height = port.max(Y) - port.min(Y);
+        final double width = port.max(LX) - port.min(LX);
+        final double height = port.max(LY) - port.min(LY);
         final double ratio = height / width;
         final double widthToAdd = width * ZOOM_UNIT * units;
         final double heightToAdd = width * ZOOM_UNIT * units * ratio;
@@ -423,10 +541,10 @@ public class GLPort implements GLEventListener {
                 portMinYAnimation -= heightToAdd;
             }
         } else { // zoomout
-            if ((bounds.min(X) < port.min(X) + portMinXAnimation - widthToAdd)
-                    & (bounds.min(Y) < port.min(Y) + portMinYAnimation - heightToAdd)
-                    & (bounds.max(X) > port.max(X) + portMaxXAnimation + widthToAdd)
-                    & (bounds.max(Y) > port.max(Y) + portMaxYAnimation + heightToAdd)) {
+            if ((bounds.min(LX) < port.min(LX) + portMinXAnimation - widthToAdd)
+                    & (bounds.min(LY) < port.min(LY) + portMinYAnimation - heightToAdd)
+                    & (bounds.max(LX) > port.max(LX) + portMaxXAnimation + widthToAdd)
+                    & (bounds.max(LY) > port.max(LY) + portMaxYAnimation + heightToAdd)) {
                 portMaxXAnimation += widthToAdd;
                 portMinXAnimation -= widthToAdd;
                 portMaxYAnimation += heightToAdd;
@@ -439,28 +557,28 @@ public class GLPort implements GLEventListener {
         if (portMaxXAnimation == 0)
             return port;
         MutableAABB currentPort = MutableAABB.create(2);
-        final double width = port.max(X) - port.min(X);
-        final double height = port.max(Y) - port.min(Y);
+        final double width = port.max(LX) - port.min(LX);
+        final double height = port.max(LY) - port.min(LY);
         final double ratio = height / width;
         double animation = Math.min(1.0, (double) (ct - portAnimationStartTime) / ANIMATION_DURATION);
-        currentPort.min(X, port.min(X) + animation * portMinXAnimation);
-        currentPort.min(Y, port.min(Y) + animation * portMinYAnimation);
-        currentPort.max(X, port.max(X) + animation * portMaxXAnimation);
-        currentPort.max(Y, port.max(Y) + animation * portMaxYAnimation);
+        currentPort.min(LX, port.min(LX) + animation * portMinXAnimation);
+        currentPort.min(LY, port.min(LY) + animation * portMinYAnimation);
+        currentPort.max(LX, port.max(LX) + animation * portMaxXAnimation);
+        currentPort.max(LY, port.max(LY) + animation * portMaxYAnimation);
         return currentPort;
     }
 
     private void fixPort(final long ct, boolean onlyIfFinished) {
-        final double width = port.max(X) - port.min(X);
-        final double height = port.max(Y) - port.min(Y);
+        final double width = port.max(LX) - port.min(LX);
+        final double height = port.max(LY) - port.min(LY);
         final double ratio = height / width;
         double animation = Math.min(1.0, (double) (ct - portAnimationStartTime) / ANIMATION_DURATION);
         if (onlyIfFinished & animation < 1.0)
             return;
-        port.min(X, port.min(X) + animation * portMinXAnimation);
-        port.min(Y, port.min(Y) + animation * portMinYAnimation);
-        port.max(X, port.max(X) + animation * portMaxXAnimation);
-        port.max(Y, port.max(Y) + animation * portMaxYAnimation);
+        port.min(LX, port.min(LX) + animation * portMinXAnimation);
+        port.min(LY, port.min(LY) + animation * portMinYAnimation);
+        port.max(LX, port.max(LX) + animation * portMaxXAnimation);
+        port.max(LY, port.max(LY) + animation * portMaxYAnimation);
         portMaxXAnimation -= animation * portMaxXAnimation;
         portMinXAnimation -= animation * portMinXAnimation;
         portMaxYAnimation -= animation * portMaxYAnimation;

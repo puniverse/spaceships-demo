@@ -33,6 +33,7 @@ dependencies {
     compile ":spacebase"
     compile ":jsr166e"
     compile "co.paralleluniverse:quasar-core:0.3.0-SNAPSHOT"
+    compile "co.paralleluniverse:quasar-actors:0.3.0-SNAPSHOT"
     compile "com.codahale.metrics:metrics-core:3.0.0" 
     compile ":jogl-all",":gluegen-rt"
     runtime ":padlock:2.2"
@@ -50,15 +51,17 @@ task copyShaders(type:Copy) {
     from 'src/main/java/co/paralleluniverse/spaceships/render/shader'
     into 'build/classes/main/co/paralleluniverse/spaceships/render/shader'
 }
+
 classes.dependsOn 'copyShaders'
 task wrapper(type: Wrapper) {
     gradleVersion = '1.5-20130302103424+0000'
 }
+
 tasks.withType(JavaExec) {
     jvmArgs '-Xmx1024m'
     jvmArgs "-javaagent:${configurations.quasar.iterator().next()}" // =v, =d
     jvmArgs '-ea'	    
-    systemProperty "co.paralleluniverse.debugMode", "true"
+//    systemProperty "co.paralleluniverse.debugMode", "true"
     systemProperty "co.paralleluniverse.globalFlightRecorder", "true"
     systemProperty "co.paralleluniverse.flightRecorderDumpFile", "spaceships.log"
     systemProperty "co.paralleluniverse.monitoring.flightRecorderSize","200000" 

@@ -26,7 +26,7 @@ import co.paralleluniverse.spacebase.SpatialQuery;
  *
  * @author eitan
  */
-public class RadarQuery implements SpatialQuery<Spaceship> {
+public class RadarQuery implements SpatialQuery<Object> {
     private final double x, y;
     private final double dev;
     private final double range;
@@ -62,7 +62,7 @@ public class RadarQuery implements SpatialQuery<Spaceship> {
     }
 
     @Override
-    public boolean queryElement(AABB aabb, Spaceship elem) {
+    public boolean queryElement(AABB aabb, Object elem) {
         double ang = Math.atan2(aabb.max(1) - y, aabb.max(0) - x);
         if (Math.abs(ang - heading) < dev)
             return true;

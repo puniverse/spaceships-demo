@@ -57,10 +57,12 @@ public class Spaceships {
 
         System.out.println("Running...");
         spaceships.run();
+        
+        Thread.sleep(100000);
     }
     //
     private final GLPort.Toolkit toolkit;
-    public final SpaceBase<Spaceship> sb;
+    public final SpaceBase<Spaceship.State> sb;
     private GLPort port = null;
     public final RandSpatial random;
     //
@@ -117,14 +119,14 @@ public class Spaceships {
         this.timeStream = new PrintStream(new FileOutputStream(timeFile), true);
     }
 
-    public co.paralleluniverse.spacebase.SpaceBase<Spaceship> getPlainSpaceBase() {
+    public co.paralleluniverse.spacebase.SpaceBase<Spaceship.State> getPlainSpaceBase() {
         return co.paralleluniverse.spacebase.SpaceBaseBuilder.from(sb);
     }
 
     /**
      * reads properties file and creates a SpaceBase instance with the requested properties.
      */
-    private SpaceBase<Spaceship> initSpaceBase(Properties props) {
+    private SpaceBase<Spaceship.State> initSpaceBase(Properties props) {
         final boolean optimistic = Boolean.parseBoolean(props.getProperty("optimistic", "true"));
         final int optimisticHeight = Integer.parseInt(props.getProperty("optimistic-height", "1"));
         final int optimisticRetryLimit = Integer.parseInt(props.getProperty("optimistic-retry-limit", "3"));
@@ -163,7 +165,7 @@ public class Spaceships {
                     .start(1, TimeUnit.SECONDS);
         }
 
-        final SpaceBase<Spaceship> space = builder.build("base1");
+        final SpaceBase<Spaceship.State> space = builder.build("base1");
         return space;
     }
 
@@ -221,7 +223,7 @@ public class Spaceships {
 //        }
     }
 
-    long now() {
+    public long now() {
         return System.currentTimeMillis();
     }
 

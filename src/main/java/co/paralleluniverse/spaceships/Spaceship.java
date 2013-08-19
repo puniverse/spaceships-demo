@@ -19,6 +19,8 @@
  */
 package co.paralleluniverse.spaceships;
 
+import co.paralleluniverse.actors.Actor;
+import co.paralleluniverse.actors.ActorRef;
 import co.paralleluniverse.actors.BasicActor;
 import co.paralleluniverse.actors.MailboxConfig;
 import co.paralleluniverse.common.util.Debug;
@@ -34,6 +36,9 @@ import co.paralleluniverse.spacebase.SpatialToken;
 import co.paralleluniverse.spacebase.quasar.ResultSet;
 import co.paralleluniverse.strands.channels.Channels;
 import static java.lang.Math.*;
+import java.nio.FloatBuffer;
+import java.util.PriorityQueue;
+import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
@@ -41,9 +46,13 @@ import java.util.concurrent.TimeUnit;
  * A spaceship
  */
 public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
+    public static enum Status {
+        ALIVE, BLOWING_UP, GONE
+    };
     private static final int MIN_PERIOD_MILLIS = 30;
     private static final int MAX_SEARCH_RANGE = 400;
-    private static final int TIMES_HITTED_TO_BLOW = 3;
+    private static final int MAX_SEARCH_RANGE_SQUARED = MAX_SEARCH_RANGE * MAX_SEARCH_RANGE;
+    private static final int TIMES_HIT_TO_BLOW = 3;
     private static final double REJECTION_COEFF = 80000.0;
     private static final double SPEED_LIMIT = 100.0;
     private static final double SPEED_BOUNCE_DAMPING = 0.9;
@@ -59,37 +68,179 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
     //
     private final Spaceships global;
     private final RandSpatial random;
-    private SpatialToken token;
     private final int id;
-    //
-    private long lastMoved = -1L;
-    private long shotTime = 0;
-    private double shotLength = 10f;
-    private int timesHit = 0;
-    private volatile long blowTime = 0;
+    private final State state; // the ships' public state - explanation below
+    private final Queue<DelayedRunnable> delayQueue = new PriorityQueue<DelayedRunnable>();
+    // private state:
+    private Status status = Status.ALIVE;
     private SpatialToken lockedOn;
     private double chaseAx;
     private double chaseAy;
-    private double x;
-    private double y;
-    private double vx;
-    private double vy;
-    private double ax;
-    private double ay;
-    // "external velocity" does not result from thruster (but from nearby explosions or by getting hit), and threfore does not affect heading
-    private long exVelocityUpdated = 0;
     private double exVx = 0;
     private double exVy = 0;
+    private long timeHit = 0;
+    private long timeFired = 0;
+    private double shotLength = 10f;
+    // "external velocity" does not result from thruster (but from nearby explosions or by getting hit), and threfore does not affect heading
+    private long exVelocityUpdated = 0;
+
+    // The public state is only updated by the owning Spaceship, and only in a SB transaction.
+    // Therefore the owning spaceship can read it any time, but anyone else (other spacehips or the renderer) must only do so in
+    // a transaction.
+    public static class State {
+        final ActorRef<SpaceshipMessage> spaceship;
+        private SpatialToken token;
+        Status status = Status.ALIVE;
+        private long lastMoved = -1L;
+        private double x;
+        private double y;
+        private double vx;
+        private double vy;
+        private double ax;
+        private double ay;
+        private double exVx = 0;
+        private double exVy = 0;
+        private long timeFired = 0;
+        private long blowTime = 0;
+        private double shotLength = 10f;
+        private int timesHit = 0;
+
+        private State(ActorRef<SpaceshipMessage> spaceship) {
+            this.spaceship = spaceship;
+        }
+
+        public AABB getAABB() {
+            final MutableAABB aabb = AABB.create(2);
+            getAABB(aabb);
+            return aabb;
+        }
+
+        public void getAABB(MutableAABB aabb) {
+            // capture x and y atomically (each)
+            final double _x = x;
+            final double _y = y;
+            aabb.min(X, _x);
+            aabb.max(X, _x);
+            aabb.min(Y, _y);
+            aabb.max(Y, _y);
+        }
+
+        public void getCurrentLocation(long currentTime, FloatBuffer buffer) {
+            final double duration = (double) (currentTime - lastMoved) / TimeUnit.SECONDS.toMillis(1);
+            final double duration2 = duration * duration;
+
+            final double currentX = x + (vx + exVx) * duration + ax * duration2;
+            final double currentY = y + (vy + exVy) * duration + ay * duration2;
+
+            buffer.put((float) currentX);
+            buffer.put((float) currentY);
+        }
+
+        public double getCurrentHeading(long currentTime) {
+            final double duration = (double) (currentTime - lastMoved) / TimeUnit.SECONDS.toMillis(1);
+
+            final double currentVx = vx + ax * duration;
+            final double currentVy = vy + ay * duration;
+
+            return atan2(currentVx, currentVy);
+        }
+
+        public double getX() {
+            return x;
+        }
+
+        public void setX(double x) {
+            this.x = x;
+        }
+
+        public double getY() {
+            return y;
+        }
+
+        public void setY(double y) {
+            this.y = y;
+        }
+
+        public double getVx() {
+            return vx;
+        }
+
+        public void setVx(double vx) {
+            this.vx = vx;
+        }
+
+        public double getVy() {
+            return vy;
+        }
+
+        public void setVy(double vy) {
+            this.vy = vy;
+        }
+
+        public double getAx() {
+            return ax;
+        }
+
+        public void setAx(double ax) {
+            this.ax = ax;
+        }
+
+        public double getAy() {
+            return ay;
+        }
+
+        public void setAy(double ay) {
+            this.ay = ay;
+        }
+
+        public double getExVx() {
+            return exVx;
+        }
+
+        public void setExVx(double exVx) {
+            this.exVx = exVx;
+        }
+
+        public double getExVy() {
+            return exVy;
+        }
+
+        public void setExVy(double exVy) {
+            this.exVy = exVy;
+        }
+
+        public long getLastMoved() {
+            return lastMoved;
+        }
+
+        public long getTimeFired() {
+            return timeFired;
+        }
+
+        public long getBlowTime() {
+            return blowTime;
+        }
+
+        public double getShotLength() {
+            return shotLength;
+        }
+
+        @Override
+        public String toString() {
+            return "timeFired:" + timeFired + " timesHit:" + timesHit + " x:" + x + " y:" + y + " vx:" + vx + " vy:" + vy;
+        }
+    }
 
     public Spaceship(Spaceships global, int id) {
         super(new MailboxConfig(10, Channels.OverflowPolicy.THROW));
         this.id = id;
+        this.state = new State(ref());
 
         this.global = global;
         this.random = global.random;
 
-        x = random.randRange(global.bounds.min(X), global.bounds.max(X));
-        y = random.randRange(global.bounds.min(Y), global.bounds.max(Y));
+        state.x = random.randRange(global.bounds.min(X), global.bounds.max(X));
+        state.y = random.randRange(global.bounds.min(Y), global.bounds.max(Y));
 
         final double direction = random.nextDouble() * 2 * Math.PI;
         final double speed = SPEED_LIMIT / 4 + random.nextGaussian() * global.speedVariance;
@@ -98,63 +249,71 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
 
     @Override
     public String toString() {
-        return "Spaceship@" + id + "{" + "shotTime:" + shotTime + " timesHit:" + timesHit + " x:" + x + " y:" + y + " vx:" + vx + " vy:" + vy + " timeShot:" + timeShot + '}';
+        return "Spaceship@" + id + '{' + state + '}';
     }
 
     @Override
     protected Void doRun() throws InterruptedException, SuspendExecution {
-        this.token = global.sb.insert(this, getAABB());
+        this.state.token = global.sb.insert(this.state, state.getAABB());
         try {
             record(1, "Spaceship", "doRun", "%s: aaaaa", this);
             for (int i = 0;; i++) {
-                final long nextMove = lastMoved + MIN_PERIOD_MILLIS;
+                final long nextMove = state.lastMoved + MIN_PERIOD_MILLIS;
 
                 SpaceshipMessage message = receive(nextMove - now(), TimeUnit.MILLISECONDS);
                 final long now = now();
                 if (message != null) {
+                    // handle message
                     if (message instanceof Shot)
                         shot(((Shot) message).x, ((Shot) message).y);
                     else if (message instanceof Blast) {
                         blast(((Blast) message).x, ((Blast) message).y);
                     }
-                } else if (nextMove - now <= 0) {
-                    if (blowTime > 0) { // if i'm being being blown up
-                        record(1, "Spaceship", "doRun", "%s: blow", this);
-                        if (global.now() - blowTime > BLOW_TILL_DELETE_DURATION)
-                            return null; // explosion has finished
-                    }
+                } else {
+                    // no message
+                    runDelayed(now); // apply delayed actions
 
-                    if (lockedOn == null) {
-                        record(1, "Spaceship", "doRun", "%s: no lock", this);
-                        if (now - getTimeShot() > SHOOT_INABILITY_DURATION && random.nextFloat() < SEARCH_PROBABLITY)
-                            searchForTargets();
-                    } else
-                        chaseAndShoot();
+                    if (status == Status.GONE) {
+                        record(1, "Spaceship", "doRun", "%s: deleting", this);
+                        return null; // explosion has finished
+                    } else if (status == Status.ALIVE) {
+                        if (lockedOn == null) {
+                            record(1, "Spaceship", "doRun", "%s: no lock", this);
+                            if (now - timeHit > SHOOT_INABILITY_DURATION && random.nextFloat() < SEARCH_PROBABLITY)
+                                searchForTargets();
+                        } else
+                            chaseAndShoot();
 
-                    try (ResultSet<Spaceship> rs = global.sb.queryForUpdate(
-                                    SpatialQueries.range(getAABB(), global.range),
-                                    SpatialQueries.equals(this, getAABB()), false)) {
+                        AABB myAABB = state.getAABB();
+                        try (ResultSet<Spaceship.State> rs = global.sb.queryForUpdate(
+                                        SpatialQueries.range(myAABB, global.range),
+                                        SpatialQueries.equals(state, myAABB), false)) {
 
-                        applyNeighborRejection(rs.getResultReadOnly(), global.now());
+                            applyNeighborRejection(rs.getResultReadOnly(), global.now());
 
-                        assert rs.getResultForUpdate().size() <= 1;
-                        for (final ElementUpdater<Spaceship> updater : rs.getResultForUpdate()) {
-                            assert updater.elem() == this;
+                            assert rs.getResultForUpdate().size() <= 1;
+                            for (final ElementUpdater<Spaceship.State> updater : rs.getResultForUpdate()) {
+                                assert updater.elem() == state;
 
-                            move(now);
-                            updater.update(getAABB());
+                                move(now);
+                                state.status = status;
+                                state.timeFired = timeFired;
+                                state.shotLength = shotLength;
+                                updater.update(state.getAABB());
+                            }
                         }
+                        reduceExternalVelocity(now);
                     }
                 }
                 record(1, "Spaceship", "doRun", "%s: iter %s", this, i);
             }
-        } catch(Exception e) {
+        } catch (Exception e) {
             e.printStackTrace();
             Debug.exit(1);
             return null;
         } finally {
             record(1, "Spaceship", "doRun", "%s: XXXXXX", this);
-            global.sb.delete(token);
+            global.sb.delete(state.token);
         }
     }
 
@@ -164,11 +323,13 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
 //        final double y2 = y + vy / v * MAX_SEARCH_RANGE;
         record(1, "Spaceship", "searchForTargets", "%s: searching...", this);
 
-        try (ResultSet<Spaceship> rs = global.sb.query(new RadarQuery(x, y, vx, vy, toRadians(30), MAX_SEARCH_RANGE))) {
-            Spaceship nearestShip = null;
-            double minRange2 = pow(MAX_SEARCH_RANGE, 2);
-            for (Spaceship s : rs.getResultReadOnly()) {
-                double rng2 = pow(s.x - x, 2) + pow(s.y - y, 2);
+        try (ResultSet<Spaceship.State> rs = global.sb.query(new RadarQuery(state.x, state.y, state.vx, state.vy, toRadians(30), MAX_SEARCH_RANGE))) {
+            Spaceship.State nearestShip = null;
+            double minRange2 = MAX_SEARCH_RANGE_SQUARED;
+            for (Spaceship.State s : rs.getResultReadOnly()) {
+                final double dx = s.x - state.x;
+                final double dy = s.y - state.y;
+                double rng2 = dx * dx + dy * dy;
                 if (rng2 > 100 & rng2 <= minRange2) { //not me and not so close
                     minRange2 = rng2;
                     nearestShip = s;
@@ -184,26 +345,22 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
         record(1, "Spaceship", "chaseAndShoot", "%s: locked", this);
         // check lock range, chase, shoot
         boolean foundLockedOn = false;
-        ElementAndBounds<Spaceship> target = global.sb.getElement(lockedOn);
+        ElementAndBounds<Spaceship.State> target = global.sb.getElement(lockedOn);
         if (target != null) {
             foundLockedOn = true;
-            final Spaceship lockedSpaceship = target.getElement();
+            final Spaceship.State lockedSpaceship = target.getElement();
 
             // double angularDiversion = abs(atan2(lockedSpaceship.vx, lockedSpaceship.vy) - getCurrentHeading(shootTime));
-            if (lockedSpaceship.getBlowTime() != 0) {
-                lockOnTarget(null);
-                return;
-            }
             if (inShotRange(target.getBounds()) & global.random.nextGaussian() < SHOOT_PROBABLITY) {
                 record(1, "Spaceship", "chaseAndShoot", "%s: shootrange", this);
-                double range = mag(lockedSpaceship.x - x, lockedSpaceship.y - y);
-                this.shoot(range);
-                lockedSpaceship.send(new Shot(x, y));
+                double range = mag(lockedSpaceship.x - state.x, lockedSpaceship.y - state.y);
+                shoot(range);
+                lockedSpaceship.spaceship.send(new Shot(state.x, state.y));
             }
             if (inLockRange(target.getBounds())) {
                 record(1, "Spaceship", "chaseAndShoot", "%s: lockrange", this);
 //              shoot(global, range);
-                chase(target.getBounds());
+                chase(target.getElement());
             } else {
                 record(1, "Spaceship", "chaseAndShoot", "%s: release lock", this);
                 lockOnTarget(null);  // not in range, release lock
@@ -214,31 +371,32 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
     }
 
     private boolean inLockRange(AABB aabb) {
-        return new RadarQuery(x, y, vx, vy, toRadians(30), MAX_SEARCH_RANGE).queryElement(aabb, null);
+        return new RadarQuery(state.x, state.y, state.vx, state.vy, toRadians(30), MAX_SEARCH_RANGE).queryElement(aabb, null);
     }
 
     private boolean inShotRange(AABB aabb) {
-        double v = mag(vx, vy);
-        final double x2 = x + vx / v * SHOOT_RANGE;
-        final double y2 = y + vy / v * SHOOT_RANGE;
-        return (new LineDistanceQuery<Spaceship>(x + 1, x2, y + 1, y2, SHOOT_ACCURACY).queryElement(aabb, this));
+        final double v = mag(state.vx, state.vy);
+        final double x2 = state.x + state.vx / v * SHOOT_RANGE;
+        final double y2 = state.y + state.vy / v * SHOOT_RANGE;
+        return (new LineDistanceQuery<Spaceship>(state.x + 1, x2, state.y + 1, y2, SHOOT_ACCURACY).queryElement(aabb, this));
     }
 
-    protected void applyNeighborRejection(Set<Spaceship> neighbors, long currentTime) {
+    // called in a transaction
+    protected void applyNeighborRejection(Set<Spaceship.State> neighbors, long currentTime) {
         final int n = neighbors.size();
 
-        ax = chaseAx;
-        ay = chaseAy;
+        state.ax = chaseAx;
+        state.ay = chaseAy;
 
         if (n > 1) {
-            for (Spaceship s : neighbors) {
-                if (s == this)
+            for (Spaceship.State s : neighbors) {
+                if (s == this.state)
                     continue;
 
-                assert !Double.isNaN(x + y);
+                assert !Double.isNaN(state.x + state.y);
 
-                final double dx = s.x - x;
-                final double dy = s.y - y;
+                final double dx = s.x - state.x;
+                final double dy = s.y - state.y;
                 double d = mag(dx, dy);
                 if (d < MIN_PROXIMITY)
                     d = MIN_PROXIMITY;
@@ -248,10 +406,10 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
 
                 double rejection = min(REJECTION_COEFF / (d * d), 250);
 
-                ax -= rejection * udx;
-                ay -= rejection * udy;
+                state.ax -= rejection * udx;
+                state.ay -= rejection * udy;
 
-                if (Double.isNaN(ax + ay))
+                if (Double.isNaN(state.ax + state.ay))
                     assert false;
             }
         }
@@ -260,65 +418,42 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
     /**
      * Update ship position
      */
-    public void move(long currentTime) {
-        final long duration = currentTime - lastMoved;
-        if (lastMoved > 0 & duration > 0) {
+    private void move(long now) {
+        assert status == Status.ALIVE;
+
+        state.exVx = exVx;
+        state.exVy = exVy;
+        if (state.lastMoved > 0 & now > state.lastMoved) {
+
             final AABB bounds = global.bounds;
-            double pos[] = getCurrentPosition(currentTime);
-            x = pos[0];
-            y = pos[1];
-            double vel[] = getCurrentVelocity(currentTime);
-            vx = vel[0];
-            vy = vel[1];
+            final double duration = (double) (now - state.lastMoved) / TimeUnit.SECONDS.toMillis(1);
+            final double duration2 = duration * duration;// * Math.signum(duration);
+
+
+            state.x = state.x + (state.vx + state.exVx) * duration + state.ax * duration2;
+            state.y = state.y + (state.vy + state.exVy) * duration + state.ay * duration2;
+
+            state.vx = state.vx + state.ax * duration;
+            state.vy = state.vy + state.ay * duration;
 
             limitSpeed();
 
-            assert !Double.isNaN(vx + vy);
+            assert !Double.isNaN(state.vx + state.vy);
 
-            if (x > bounds.max(X) || x < bounds.min(X)) {
-                x = min(x, bounds.max(X));
-                x = max(x, bounds.min(X));
-                vx = -vx * SPEED_BOUNCE_DAMPING;
+            if (state.x > bounds.max(X) || state.x < bounds.min(X)) {
+                state.x = min(state.x, bounds.max(X));
+                state.x = max(state.x, bounds.min(X));
+                state.vx = -state.vx * SPEED_BOUNCE_DAMPING;
             }
-            if (y > bounds.max(Y) || y < bounds.min(Y)) {
-                y = min(y, bounds.max(Y));
-                y = max(y, bounds.min(Y));
-                vy = -vy * SPEED_BOUNCE_DAMPING;
+            if (state.y > bounds.max(Y) || state.y < bounds.min(Y)) {
+                state.y = min(state.y, bounds.max(Y));
+                state.y = max(state.y, bounds.min(Y));
+                state.vy = -state.vy * SPEED_BOUNCE_DAMPING;
             }
 
-            assert !Double.isNaN(x + y);
+            assert !Double.isNaN(state.x + state.y);
         }
-        this.lastMoved = currentTime;
-        reduceExternalVelocity(currentTime);
-    }
-
-    /**
-     * extrapolate position
-     */
-    public double[] getCurrentPosition(long currentTime) {
-        if (blowTime > 0)
-            currentTime = blowTime; // don't move while blowing up
-        double duration = (double) (currentTime - lastMoved) / TimeUnit.SECONDS.toMillis(1);
-        double duration2 = duration * duration;// * Math.signum(duration);
-        double pos[] = {x + (vx + exVx) * duration + ax * duration2, y + (vy + exVy) * duration + ay * duration2};
-        return pos;
-    }
-
-    /**
-     * extrapolate velocity
-     */
-    public double[] getCurrentVelocity(long currentTime) {
-        double duration = (double) (currentTime - lastMoved) / TimeUnit.SECONDS.toMillis(1);
-        double velocity[] = {vx + (ax) * duration, vy + (ay) * duration};
-        return velocity;
-    }
-
-    /**
-     * extrapolate heading
-     */
-    public double getCurrentHeading(long currentTime) {
-        double velocity[] = getCurrentVelocity(currentTime);
-        return atan2(velocity[0], velocity[1]);
+        state.lastMoved = now;
     }
 
     private void reduceExternalVelocity(long currentTime) {
@@ -333,9 +468,9 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
     /**
      * Accelerate toward given ship
      */
-    private void chase(AABB target) {
-        final double dx = target.min(X) - x;
-        final double dy = target.min(Y) - y;
+    private void chase(Spaceship.State target) {
+        final double dx = target.x - state.x;
+        final double dy = target.x - state.y;
         double d = mag(dx, dy);
         if (d < MIN_PROXIMITY)
             d = MIN_PROXIMITY;
@@ -354,31 +489,37 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
      */
     private void shot(double shooterX, double shooterY) throws SuspendExecution, InterruptedException {
         record(1, "Spaceship", "shot", "%s: shot", this);
-        this.timesHit++;
-        this.timeShot = global.now();
-        if (timesHit < TIMES_HITTED_TO_BLOW) {
-            final double dx = shooterX - x;
-            final double dy = shooterY - y;
+        state.timesHit++;
+        timeHit = global.now();
+        if (state.timesHit < TIMES_HIT_TO_BLOW) {
+            final double dx = shooterX - state.x;
+            final double dy = shooterY - state.y;
             double d = mag(dx, dy);
             if (d < MIN_PROXIMITY)
                 d = MIN_PROXIMITY;
             final double udx = dx / d;
             final double udy = dy / d;
 
-            reduceExternalVelocity(timeShot);
+            reduceExternalVelocity(timeHit);
             exVx += HIT_RECOIL_VELOCITY * udx;
             exVy += HIT_RECOIL_VELOCITY * udy;
-            this.exVelocityUpdated = timeShot;
-        } else if (blowTime == 0) {
+            this.exVelocityUpdated = timeHit;
+        } else if (status == Status.ALIVE) {
             System.out.println("BOOM: " + this);
             record(1, "Spaceship", "shot", "%s: BOOM", this);
             // I'm dead: blow up. The explosion pushes away all nearby ships.
-            try (ResultSet<Spaceship> rs = global.sb.query(SpatialQueries.range(getAABB(), BLAST_RANGE))) {
-                final Blast blastMessage = new Blast(now(), x, y);
-                for (Spaceship s : rs.getResultReadOnly())
-                    s.send(blastMessage);
+            try (ResultSet<Spaceship.State> rs = global.sb.query(SpatialQueries.range(state.getAABB(), BLAST_RANGE))) {
+                final Blast blastMessage = new Blast(now(), state.x, state.y);
+                for (Spaceship.State s : rs.getResultReadOnly())
+                    s.spaceship.send(blastMessage);
             }
-            blowTime = global.now();
+            this.status = Status.BLOWING_UP;
+            state.blowTime = timeHit;
+            delay(timeHit, BLOW_TILL_DELETE_DURATION, TimeUnit.MILLISECONDS, new Runnable() {
+                public void run() {
+                    status = Status.GONE;
+                }
+            });
         }
     }
 
@@ -386,8 +527,8 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
      * A nearby ship has exploded, accelerate away in the blast.
      */
     private void blast(double explosionX, double explosionY) {
-        final double dx = explosionX - x;
-        final double dy = explosionY - y;
+        final double dx = explosionX - state.x;
+        final double dy = explosionY - state.y;
         final double d = mag(dx, dy);
         if (d < MIN_PROXIMITY)
             return;
@@ -402,29 +543,25 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
         this.exVelocityUpdated = global.now();
     }
 
-    public long getLastMoved() {
-        return lastMoved;
-    }
-
     private long now() {
         return global.now();
     }
 
     private void setVelocityDir(double direction, double speed) {
-        vx = speed * cos(direction);
-        vy = speed * sin(direction);
+        state.vx = speed * cos(direction);
+        state.vy = speed * sin(direction);
         limitSpeed();
     }
 
     private void limitSpeed() {
-        final double speed = mag(vx, vy);
+        final double speed = mag(state.vx, state.vy);
         if (speed > SPEED_LIMIT) {
-            vx = vx / speed * SPEED_LIMIT;
-            vy = vy / speed * SPEED_LIMIT;
+            state.vx = state.vx / speed * SPEED_LIMIT;
+            state.vy = state.vy / speed * SPEED_LIMIT;
         }
     }
 
-    private void lockOnTarget(Spaceship target) {
+    private void lockOnTarget(Spaceship.State target) {
         if (target != null) {
             lockedOn = target.token;
             chaseAx = 0;
@@ -434,7 +571,7 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
     }
 
     private void shoot(double range) {
-        shotTime = global.now();
+        timeFired = global.now();
         shotLength = range;
     }
 
@@ -442,45 +579,24 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
         return sqrt(x * x + y * y);
     }
 
-    public AABB getAABB() {
-        final MutableAABB aabb = AABB.create(2);
-        getAABB(aabb);
-        return aabb;
+    private void runDelayed(long now) {
+        for (;;) {
+            DelayedRunnable command = delayQueue.peek();
+            if (command != null && command.time <= now) {
+                delayQueue.poll();
+                command.run();
+            } else
+                break;
+        }
     }
 
-    public void getAABB(MutableAABB aabb) {
-        // capture x and y atomically (each)
-        final double _x = x;
-        final double _y = y;
-        aabb.min(X, _x);
-        aabb.max(X, _x);
-        aabb.min(Y, _y);
-        aabb.max(Y, _y);
-    }
-
-    public double getX() {
-        return x;
-    }
-
-    public double getY() {
-        return y;
-    }
-
-    public double getShotLength() {
-        return shotLength;
-    }
-    private long timeShot = 0;
-
-    public long getTimeShot() {
-        return timeShot;
-    }
-
-    public long getBlowTime() {
-        return blowTime;
-    }
-
-    public long getShotTime() {
-        return shotTime;
+    private void delay(long now, long delay, TimeUnit unit, final Runnable command) {
+        delayQueue.add(new DelayedRunnable(now + unit.toMillis(delay)) {
+            @Override
+            public void run() {
+                command.run();
+            }
+        });
     }
 
     static class SpaceshipMessage {
@@ -505,6 +621,19 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
             this.time = time;
             this.x = x;
             this.y = y;
+        }
+    }
+
+    static abstract class DelayedRunnable implements Runnable, Comparable<DelayedRunnable> {
+        final long time;
+
+        public DelayedRunnable(long time) {
+            this.time = time;
+        }
+
+        @Override
+        public int compareTo(DelayedRunnable o) {
+            return Long.signum(this.time - o.time);
         }
     }
 }
