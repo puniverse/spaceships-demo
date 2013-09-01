@@ -268,7 +268,7 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
                         AABB myAABB = state.getAABB();
                         try (ResultSet<Record<SpaceshipState>> rs = global.sb.queryForUpdate(
                                         SpatialQueries.range(myAABB, global.range),
-                                        SpatialQueries.equals((Record<SpaceshipState>)state, myAABB), false)) {
+                                        SpatialQueries.equals((Record<SpaceshipState>) state, myAABB), false)) {
 
                             applyNeighborRejection(rs.getResultReadOnly(), global.now());
 
@@ -435,11 +435,13 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
                 state.x = min(state.x, bounds.max(X));
                 state.x = max(state.x, bounds.min(X));
                 state.vx = -state.vx * SPEED_BOUNCE_DAMPING;
+                state.ax = 0;
             }
             if (state.y > bounds.max(Y) || state.y < bounds.min(Y)) {
                 state.y = min(state.y, bounds.max(Y));
                 state.y = max(state.y, bounds.min(Y));
                 state.vy = -state.vy * SPEED_BOUNCE_DAMPING;
+                state.ay = 0;
             }
 
             assert !Double.isNaN(state.x + state.y);
@@ -553,12 +555,12 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
     }
 
     private void lockOnTarget(Record<SpaceshipState> target) {
-        if (target != null) {
+        if (target != null)
             lockedOn = target.get(SpaceshipState.token);
-            chaseAx = 0;
-            chaseAy = 0;
-        } else
+        else
             lockedOn = null;
+        chaseAx = 0;
+        chaseAy = 0;
     }
 
     private void shoot(double range) {
