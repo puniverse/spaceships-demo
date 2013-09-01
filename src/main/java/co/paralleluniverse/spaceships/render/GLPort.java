@@ -31,6 +31,7 @@ import co.paralleluniverse.spacebase.SpatialToken;
 import co.paralleluniverse.spacebase.SpatialVisitor;
 import co.paralleluniverse.spaceships.Spaceship;
 import co.paralleluniverse.spaceships.SpaceshipState;
+import static co.paralleluniverse.spaceships.SpaceshipState.*;
 import co.paralleluniverse.spaceships.Spaceships;
 import com.jogamp.newt.awt.NewtCanvasAWT;
 import com.jogamp.newt.opengl.GLWindow;
@@ -345,14 +346,14 @@ public class GLPort implements GLEventListener {
             Record<SpaceshipState> s = ships[i];
             Spaceship.getCurrentLocation(s, now, verticesb);
 
-            if (s.get(SpaceshipState.blowTime) > 0)  // 0.01 - start blow animation, 1.0 - end of animation
-                colorsb.put(Math.min(1.0f, (now - s.get(SpaceshipState.blowTime)) / EXPLOSION_DURATION));
+            if (s.get($blowTime) > 0)  // 0.01 - start blow animation, 1.0 - end of animation
+                colorsb.put(Math.min(1.0f, (now - s.get($blowTime)) / EXPLOSION_DURATION));
             else
                 colorsb.put(0); // ship isn't blowing up
             colorsb.put((float) Spaceship.getCurrentHeading(s, now));
 
             // put the shotLength (0 for ship that's not firing)
-            colorsb.put(now - s.get(SpaceshipState.timeFired) < SHOOT_DURATION ? (float) s.get(SpaceshipState.shotLength) : 0f);
+            colorsb.put(now - s.get($timeFired) < SHOOT_DURATION ? (float) s.get($shotLength) : 0f);
 
             if (portContains(i))
                 countInPort++;
@@ -394,7 +395,7 @@ public class GLPort implements GLEventListener {
         sb.query(query, new SpatialVisitor<Record<SpaceshipState>>() {
             @Override
             public void visit(Record<SpaceshipState> s, SpatialToken st) {
-                if (s.get(SpaceshipState.lastMoved) == 0)
+                if (s.get($lastMoved) == 0)
                     return;
 
                 final int index = indexGen.getAndIncrement();
@@ -443,18 +444,18 @@ public class GLPort implements GLEventListener {
     }
 
     private void copy(int index, Record<SpaceshipState> state) {
-        setDataLong(index, LAST_MOVED, state.get(SpaceshipState.lastMoved));
-        setDataDouble(index, LX, state.get(SpaceshipState.x));
-        setDataDouble(index, LY, state.get(SpaceshipState.y));
-        setDataDouble(index, VX, state.get(SpaceshipState.vx));
-        setDataDouble(index, VY, state.get(SpaceshipState.vy));
-        setDataDouble(index, EVX, state.get(SpaceshipState.exVx));
-        setDataDouble(index, EVY, state.get(SpaceshipState.exVy));
-        setDataDouble(index, AX, state.get(SpaceshipState.ax));
-        setDataDouble(index, AY, state.get(SpaceshipState.ay));
-        setDataLong(index, SHOT_TIME, state.get(SpaceshipState.timeFired));
-        setDataLong(index, BLOW_TIME, state.get(SpaceshipState.blowTime));
-        setDataDouble(index, SHOT_LENGTH, state.get(SpaceshipState.shotLength));
+        setDataLong(index, LAST_MOVED, state.get(SpaceshipState.$lastMoved));
+        setDataDouble(index, LX, state.get($x));
+        setDataDouble(index, LY, state.get($y));
+        setDataDouble(index, VX, state.get($vx));
+        setDataDouble(index, VY, state.get($vy));
+        setDataDouble(index, EVX, state.get($exVx));
+        setDataDouble(index, EVY, state.get($exVy));
+        setDataDouble(index, AX, state.get($ax));
+        setDataDouble(index, AY, state.get($ay));
+        setDataLong(index, SHOT_TIME, state.get($timeFired));
+        setDataLong(index, BLOW_TIME, state.get($blowTime));
+        setDataDouble(index, SHOT_LENGTH, state.get($shotLength));
     }
 
     private boolean portContains(int index) {

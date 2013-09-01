@@ -32,32 +32,32 @@ import java.util.Set;
  * @author pron
  */
 public final class SpaceshipState {
-    public static final LongField<SpaceshipState> lastMoved = new LongField<>("lastMoved", 0);
-    public static final LongField<SpaceshipState> timeFired = new LongField<>("timeFired", 1);
-    public static final LongField<SpaceshipState> blowTime = new LongField<>("blowTime", 2);
-    public static final DoubleField<SpaceshipState> shotLength = new DoubleField<>("shotLength", 3);
-    public static final DoubleField<SpaceshipState> x = new DoubleField<>("x", 4);
-    public static final DoubleField<SpaceshipState> y = new DoubleField<>("y", 5);
-    public static final DoubleField<SpaceshipState> vx = new DoubleField<>("vx", 6);
-    public static final DoubleField<SpaceshipState> vy = new DoubleField<>("vy", 7);
-    public static final DoubleField<SpaceshipState> ax = new DoubleField<>("ax", 8);
-    public static final DoubleField<SpaceshipState> ay = new DoubleField<>("ay", 9);
-    public static final DoubleField<SpaceshipState> exVx = new DoubleField<>("exVx", 10);
-    public static final DoubleField<SpaceshipState> exVy = new DoubleField<>("exVy", 11);
-    public static final ObjectField<SpaceshipState, SpatialToken> token = new ObjectField<>("token", 12);
-    public static final ObjectField<SpaceshipState, ActorRef<Spaceship.SpaceshipMessage>> spaceship = new ObjectField<>("spaceship", 13);
+    public static final LongField<SpaceshipState> $lastMoved = new LongField<>("lastMoved", 0);
+    public static final LongField<SpaceshipState> $timeFired = new LongField<>("timeFired", 1);
+    public static final LongField<SpaceshipState> $blowTime = new LongField<>("blowTime", 2);
+    public static final DoubleField<SpaceshipState> $shotLength = new DoubleField<>("shotLength", 3);
+    public static final DoubleField<SpaceshipState> $x = new DoubleField<>("x", 4);
+    public static final DoubleField<SpaceshipState> $y = new DoubleField<>("y", 5);
+    public static final DoubleField<SpaceshipState> $vx = new DoubleField<>("vx", 6);
+    public static final DoubleField<SpaceshipState> $vy = new DoubleField<>("vy", 7);
+    public static final DoubleField<SpaceshipState> $ax = new DoubleField<>("ax", 8);
+    public static final DoubleField<SpaceshipState> $ay = new DoubleField<>("ay", 9);
+    public static final DoubleField<SpaceshipState> $exVx = new DoubleField<>("exVx", 10);
+    public static final DoubleField<SpaceshipState> $exVy = new DoubleField<>("exVy", 11);
+    public static final ObjectField<SpaceshipState, SpatialToken> $token = new ObjectField<>("token", 12);
+    public static final ObjectField<SpaceshipState, ActorRef<Spaceship.SpaceshipMessage>> $spaceship = new ObjectField<>("spaceship", 13);
     //
     public static final Set FIELDS = ImmutableSet.of(
-            lastMoved,
-            timeFired,
-            blowTime,
-            shotLength,
-            x, y,
-            vx, vy,
-            ax, ay,
-            exVx, exVy,
-            token,
-            spaceship);
+            $lastMoved,
+            $timeFired,
+            $blowTime,
+            $shotLength,
+            $x, $y,
+            $vx, $vy,
+            $ax, $ay,
+            $exVx, $exVy,
+            $token,
+            $spaceship);
     
     private SpaceshipState() {
     }

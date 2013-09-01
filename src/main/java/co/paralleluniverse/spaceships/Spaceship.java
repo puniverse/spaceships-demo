@@ -40,8 +40,8 @@ import co.paralleluniverse.spacebase.SpatialQueries;
 import co.paralleluniverse.spacebase.SpatialToken;
 import co.paralleluniverse.spacebase.quasar.ElementUpdater1;
 import co.paralleluniverse.spacebase.quasar.ResultSet;
+import static co.paralleluniverse.spaceships.SpaceshipState.*;
 import co.paralleluniverse.strands.channels.Channels;
-import com.google.common.collect.ImmutableSet;
 import static java.lang.Math.*;
 import java.nio.FloatBuffer;
 import java.util.PriorityQueue;
@@ -192,21 +192,21 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
     }
 
     public static void getCurrentLocation(Record<SpaceshipState> s, long currentTime, FloatBuffer buffer) {
-        final double duration = (double) (currentTime - s.get(SpaceshipState.lastMoved)) / TimeUnit.SECONDS.toMillis(1);
+        final double duration = (double) (currentTime - s.get($lastMoved)) / TimeUnit.SECONDS.toMillis(1);
         final double duration2 = duration * duration;
 
-        final double currentX = s.get(SpaceshipState.x) + (s.get(SpaceshipState.vx) + s.get(SpaceshipState.exVx)) * duration + s.get(SpaceshipState.ax) * duration2;
-        final double currentY = s.get(SpaceshipState.y) + (s.get(SpaceshipState.vy) + s.get(SpaceshipState.exVx)) * duration + s.get(SpaceshipState.ay) * duration2;
+        final double currentX = s.get($x) + (s.get($vx) + s.get($exVx)) * duration + s.get($ax) * duration2;
+        final double currentY = s.get($y) + (s.get($vy) + s.get($exVx)) * duration + s.get($ay) * duration2;
 
         buffer.put((float) currentX);
         buffer.put((float) currentY);
     }
 
     public static double getCurrentHeading(Record<SpaceshipState> s, long currentTime) {
-        final double duration = (double) (currentTime - s.get(SpaceshipState.lastMoved)) / TimeUnit.SECONDS.toMillis(1);
+        final double duration = (double) (currentTime - s.get($lastMoved)) / TimeUnit.SECONDS.toMillis(1);
 
-        final double currentVx = s.get(SpaceshipState.vx) + s.get(SpaceshipState.ax) * duration;
-        final double currentVy = s.get(SpaceshipState.vy) + s.get(SpaceshipState.ay) * duration;
+        final double currentVx = s.get($vx) + s.get($ax) * duration;
+        final double currentVy = s.get($vy) + s.get($ay) * duration;
 
         return atan2(currentVx, currentVy);
     }
@@ -318,8 +318,8 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
             Record<SpaceshipState> nearestShip = null;
             double minRange2 = MAX_SEARCH_RANGE_SQUARED;
             for (Record<SpaceshipState> s : rs.getResultReadOnly()) {
-                final double dx = s.get(SpaceshipState.x) - state.x;
-                final double dy = s.get(SpaceshipState.y) - state.y;
+                final double dx = s.get($x) - state.x;
+                final double dy = s.get($y) - state.y;
                 double rng2 = dx * dx + dy * dy;
                 if (rng2 > 100 & rng2 <= minRange2) { //not me and not so close
                     minRange2 = rng2;
@@ -344,9 +344,9 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
             // double angularDiversion = abs(atan2(lockedSpaceship.vx, lockedSpaceship.vy) - getCurrentHeading(shootTime));
             if (inShotRange(target.getBounds()) & global.random.nextGaussian() < SHOOT_PROBABLITY) {
                 record(1, "Spaceship", "chaseAndShoot", "%s: shootrange", this);
-                double range = mag(lockedSpaceship.get(SpaceshipState.x) - state.x, lockedSpaceship.get(SpaceshipState.y) - state.y);
+                double range = mag(lockedSpaceship.get($x) - state.x, lockedSpaceship.get($y) - state.y);
                 shoot(range);
-                lockedSpaceship.get(SpaceshipState.spaceship).send(new Shot(state.x, state.y));
+                lockedSpaceship.get($spaceship).send(new Shot(state.x, state.y));
             }
             if (inLockRange(target.getBounds())) {
                 record(1, "Spaceship", "chaseAndShoot", "%s: lockrange", this);
@@ -386,8 +386,8 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
 
                 assert !Double.isNaN(state.x + state.y);
 
-                final double dx = s.get(SpaceshipState.x) - state.x;
-                final double dy = s.get(SpaceshipState.y) - state.y;
+                final double dx = s.get($x) - state.x;
+                final double dy = s.get($y) - state.y;
                 double d = mag(dx, dy);
                 if (d < MIN_PROXIMITY)
                     d = MIN_PROXIMITY;
@@ -462,8 +462,8 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
      * Accelerate toward given ship
      */
     private void chase(Record<SpaceshipState> target) {
-        final double dx = target.get(SpaceshipState.x) - state.x;
-        final double dy = target.get(SpaceshipState.y) - state.y;
+        final double dx = target.get($x) - state.x;
+        final double dy = target.get($y) - state.y;
         double d = mag(dx, dy);
         if (d < MIN_PROXIMITY)
             d = MIN_PROXIMITY;
@@ -504,7 +504,7 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
             try (ResultSet<Record<SpaceshipState>> rs = global.sb.query(SpatialQueries.range(state.getAABB(), BLAST_RANGE))) {
                 final Blast blastMessage = new Blast(now(), state.x, state.y);
                 for (Record<SpaceshipState> s : rs.getResultReadOnly())
-                    s.get(SpaceshipState.spaceship).send(blastMessage);
+                    s.get($spaceship).send(blastMessage);
             }
             this.status = Status.BLOWING_UP;
             state.blowTime = timeHit;
@@ -556,7 +556,7 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
 
     private void lockOnTarget(Record<SpaceshipState> target) {
         if (target != null)
-            lockedOn = target.get(SpaceshipState.token);
+            lockedOn = target.get($token);
         else
             lockedOn = null;
         chaseAx = 0;
