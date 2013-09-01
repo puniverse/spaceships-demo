@@ -592,7 +592,7 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
         });
     }
 
-    static class SpaceshipMessage {
+    public static class SpaceshipMessage {
     }
 
     static class Shot extends SpaceshipMessage {

@@ -23,7 +23,6 @@ import co.paralleluniverse.actors.ActorRef;
 import co.paralleluniverse.common.record.DoubleField;
 import co.paralleluniverse.common.record.LongField;
 import co.paralleluniverse.common.record.ObjectField;
-import co.paralleluniverse.common.record.Record;
 import co.paralleluniverse.spacebase.SpatialToken;
 import com.google.common.collect.ImmutableSet;
 import java.util.Set;
@@ -32,7 +31,7 @@ import java.util.Set;
  *
  * @author pron
  */
-public interface SpaceshipState extends Record<SpaceshipState> {
+public final class SpaceshipState {
     public static final LongField<SpaceshipState> lastMoved = new LongField<>("lastMoved", 0);
     public static final LongField<SpaceshipState> timeFired = new LongField<>("timeFired", 1);
     public static final LongField<SpaceshipState> blowTime = new LongField<>("blowTime", 2);
@@ -59,4 +58,7 @@ public interface SpaceshipState extends Record<SpaceshipState> {
             exVx, exVy,
             token,
             spaceship);
+    
+    private SpaceshipState() {
+    }
 }
