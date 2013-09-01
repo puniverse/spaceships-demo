@@ -22,6 +22,7 @@ package co.paralleluniverse.spaceships;
 import co.paralleluniverse.actors.ActorRef;
 import co.paralleluniverse.actors.LocalActorUtil;
 import co.paralleluniverse.common.monitoring.Metrics;
+import co.paralleluniverse.common.record.Record;
 import co.paralleluniverse.common.util.Debug;
 import co.paralleluniverse.fibers.Fiber;
 import co.paralleluniverse.spacebase.AABB;
@@ -64,7 +65,7 @@ public class Spaceships {
     }
     //
     private final GLPort.Toolkit toolkit;
-    public final SpaceBase<Spaceship.State> sb;
+    public final SpaceBase<Record<SpaceshipState>> sb;
     private GLPort port = null;
     public final RandSpatial random;
     //
@@ -121,14 +122,14 @@ public class Spaceships {
         this.timeStream = new PrintStream(new FileOutputStream(timeFile), true);
     }
 
-    public co.paralleluniverse.spacebase.SpaceBase<Spaceship.State> getPlainSpaceBase() {
+    public co.paralleluniverse.spacebase.SpaceBase<Record<SpaceshipState>> getPlainSpaceBase() {
         return co.paralleluniverse.spacebase.SpaceBaseBuilder.from(sb);
     }
 
     /**
      * reads properties file and creates a SpaceBase instance with the requested properties.
      */
-    private SpaceBase<Spaceship.State> initSpaceBase(Properties props) {
+    private SpaceBase<Record<SpaceshipState>> initSpaceBase(Properties props) {
         final boolean optimistic = Boolean.parseBoolean(props.getProperty("optimistic", "true"));
         final int optimisticHeight = Integer.parseInt(props.getProperty("optimistic-height", "1"));
         final int optimisticRetryLimit = Integer.parseInt(props.getProperty("optimistic-retry-limit", "3"));
@@ -167,7 +168,7 @@ public class Spaceships {
                     .start(1, TimeUnit.SECONDS);
         }
 
-        final SpaceBase<Spaceship.State> space = builder.build("base1");
+        final SpaceBase<Record<SpaceshipState>> space = builder.build("base1");
         return space;
     }
 
