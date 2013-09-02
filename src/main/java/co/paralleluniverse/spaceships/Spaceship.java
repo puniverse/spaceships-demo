@@ -23,10 +23,11 @@ import co.paralleluniverse.actors.ActorRef;
 import co.paralleluniverse.actors.BasicActor;
 import co.paralleluniverse.actors.MailboxConfig;
 import co.paralleluniverse.common.record.AbstractRecord;
-import co.paralleluniverse.common.record.DoubleField;
+import co.paralleluniverse.common.record.DynamicRecord;
 import co.paralleluniverse.common.record.Field;
-import co.paralleluniverse.common.record.LongField;
-import co.paralleluniverse.common.record.ObjectField;
+import co.paralleluniverse.common.record.Field.DoubleField;
+import co.paralleluniverse.common.record.Field.LongField;
+import co.paralleluniverse.common.record.Field.ObjectField;
 import co.paralleluniverse.common.record.Record;
 import co.paralleluniverse.common.util.Debug;
 import co.paralleluniverse.fibers.SuspendExecution;
@@ -43,10 +44,12 @@ import co.paralleluniverse.spacebase.quasar.ResultSet;
 import static co.paralleluniverse.spaceships.SpaceshipState.*;
 import co.paralleluniverse.strands.channels.Channels;
 import static java.lang.Math.*;
+import java.lang.invoke.MethodHandles;
 import java.nio.FloatBuffer;
 import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.Phaser;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -78,6 +81,7 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
     private final int id;
     private final State state; // the ships' public state - explanation below
     private final Queue<DelayedRunnable> delayQueue = new PriorityQueue<DelayedRunnable>();
+    private final Phaser phaser;
     // private state:
     private Status status = Status.ALIVE;
     private SpatialToken lockedOn;
@@ -94,22 +98,24 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
     // The public state is only updated by the owning Spaceship, and only in a SB transaction.
     // Therefore the owning spaceship can read it any time, but anyone else (other spacehips or the renderer) must only do so in
     // a transaction.
-    private static class State extends AbstractRecord<SpaceshipState> {
-        private ActorRef<SpaceshipMessage> spaceship;
-        private SpatialToken token;
+    public static class State extends DynamicRecord<SpaceshipState> {
+        private static final MethodHandles.Lookup lookup = MethodHandles.lookup();
+        
+        public ActorRef<SpaceshipMessage> spaceship;
+        public SpatialToken token;
         Status status = Status.ALIVE;
         private long lastMoved = -1L;
-        private double x;
+        public double x;
         private double y;
-        private double vx;
+        public double vx;
         private double vy;
-        private double ax;
+        public double ax;
         private double ay;
-        private double exVx = 0;
+        public double exVx = 0;
         private double exVy = 0;
-        private long timeFired = 0;
+        public long timeFired = 0;
         private long blowTime = 0;
-        private double shotLength = 10f;
+        public double shotLength = 10f;
         private int timesHit = 0;
 
         public AABB getAABB() {
@@ -133,57 +139,57 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
             return SpaceshipState.FIELDS;
         }
 
-        @Override
-        public long get(LongField<? super SpaceshipState> field) {
-            switch (field.id()) {
-                case 0:
-                    return lastMoved;
-                case 1:
-                    return timeFired;
-                case 2:
-                    return blowTime;
-                default:
-                    return super.get(field);
-            }
-        }
-
-        @Override
-        public double get(DoubleField<? super SpaceshipState> field) {
-            switch (field.id()) {
-                case 3:
-                    return shotLength;
-                case 4:
-                    return x;
-                case 5:
-                    return y;
-                case 6:
-                    return vx;
-                case 7:
-                    return vy;
-                case 8:
-                    return ax;
-                case 9:
-                    return ay;
-                case 10:
-                    return exVx;
-                case 11:
-                    return exVy;
-                default:
-                    return super.get(field);
-            }
-        }
-
-        @Override
-        public <V> V get(ObjectField<? super SpaceshipState, V> field) {
-            switch (field.id()) {
-                case 12:
-                    return (V) token;
-                case 13:
-                    return (V) spaceship;
-                default:
-                    return super.get(field);
-            }
-        }
+//        @Override
+//        public long get(LongField<? super SpaceshipState> field) {
+//            switch (field.id()) {
+//                case 0:
+//                    return lastMoved;
+//                case 1:
+//                    return timeFired;
+//                case 2:
+//                    return blowTime;
+//                default:
+//                    return super.get(field);
+//            }
+//        }
+//
+//        @Override
+//        public double get(DoubleField<? super SpaceshipState> field) {
+//            switch (field.id()) {
+//                case 3:
+//                    return shotLength;
+//                case 4:
+//                    return x;
+//                case 5:
+//                    return y;
+//                case 6:
+//                    return vx;
+//                case 7:
+//                    return vy;
+//                case 8:
+//                    return ax;
+//                case 9:
+//                    return ay;
+//                case 10:
+//                    return exVx;
+//                case 11:
+//                    return exVy;
+//                default:
+//                    return super.get(field);
+//            }
+//        }
+//
+//        @Override
+//        public <V> V get(ObjectField<? super SpaceshipState, V> field) {
+//            switch (field.id()) {
+//                case 12:
+//                    return (V) token;
+//                case 13:
+//                    return (V) spaceship;
+//                default:
+//                    return super.get(field);
+//            }
+//        }
 
         @Override
         public String toString() {
@@ -211,10 +217,11 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
         return atan2(currentVx, currentVy);
     }
 
-    public Spaceship(Spaceships global, int id) {
+    public Spaceship(Spaceships global, int id, Phaser phaser) {
         super(new MailboxConfig(10, Channels.OverflowPolicy.THROW));
         this.id = id;
         this.state = new State();
+        this.phaser = phaser;
 
         this.global = global;
         this.random = global.random;
@@ -234,6 +241,7 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
 
     @Override
     protected Void doRun() throws InterruptedException, SuspendExecution {
+//        phaser.register();
         state.spaceship = ref();
         state.token = global.sb.insert(this.state, state.getAABB());
         try {
@@ -297,6 +305,7 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
                     }
                 }
                 record(1, "Spaceship", "doRun", "%s: iter %s", this, i);
+//                phaser.arrive();
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -304,6 +313,7 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
             return null;
         } finally {
             record(1, "Spaceship", "doRun", "%s: XXXXXX", this);
+//            phaser.arriveAndDeregister();
             global.sb.delete(state.token);
         }
     }

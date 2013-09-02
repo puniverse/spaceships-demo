@@ -34,6 +34,7 @@ import java.io.FileOutputStream;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.util.Properties;
+import java.util.concurrent.Phaser;
 import java.util.concurrent.TimeUnit;
 
 public class Spaceships {
@@ -59,7 +60,7 @@ public class Spaceships {
 
         System.out.println("Running...");
         spaceships.run();
-        
+
         Thread.sleep(100000);
     }
     //
@@ -176,50 +177,36 @@ public class Spaceships {
      */
     private void run() throws Exception {
         ActorRef<Spaceship.SpaceshipMessage>[] ships = new ActorRef[N];
+        Phaser phaser = new Phaser();
         for (int i = 0; i < N; i++) {
-            ships[i] = new Spaceship(this, i).spawn();
+            ships[i] = new Spaceship(this, i, phaser).spawn();
         }
 
         Thread.sleep(3000);
         port = new GLPort(toolkit, N, Spaceships.this, bounds);
-        
-        for(ActorRef<Spaceship.SpaceshipMessage> s : ships)
-            LocalActorUtil.join(s);
-        
-//        long initTime = System.nanoTime();
-//
-//        if (timeStream != null)
-//            timeStream.println("# time, millis, millis1, millis0");
-//
-//        for (int k = 0;; k++) {
-//            cycleStart = System.nanoTime();
-//
-//            for (final Spaceship s : ships) {
-//                try {
-//                    s.join(); // wait for this spaceship's previous action (from the previous cycle) to complete
-//                    final Sync sync = s.run(Spaceships.this);
-//                    s.setSync(sync);
-//                } catch (InterruptedException e) {
-//                    throw new RuntimeException(e);
-//                }
-//            }
-//
-//            float millis = millis(cycleStart);
-//            if (timeStream != null)
-//                timeStream.println(k + "," + millis);
-//
-//            if (millis(cycleStart) < 10) // don't work too hard: if the cycle has taken less than 10 millis, wait a little.
-//                Thread.sleep(10 - (int) millis(cycleStart));
-//
-//            millis = millis(cycleStart);
-//
-//            if (port == null
-//                    & (millis < POSTPONE_GLPORT_UNTIL_SB_CYCLE_UNDER_X_MILLIS
-//                    | millis(initTime) > MAX_PORT_POSTPONE_MILLIS)) // wait for JIT to make everything run smoothly before opening port
-//                port = new GLPort(toolkit, N, Spaceships.this, bounds);
-//
-//            System.out.println("CYCLE: " + millis + " millis ");
-//        }
+
+        if (timeStream != null)
+            timeStream.println("# time, millis, millis1, millis0");
+
+        for (int k = 0;; k++) {
+            cycleStart = System.nanoTime();
+
+            phaser.awaitAdvance(k);
+
+            float millis = millis(cycleStart);
+            if (timeStream != null)
+                timeStream.println(k + "," + millis);
+
+            if (millis(cycleStart) < 10) // don't work too hard: if the cycle has taken less than 10 millis, wait a little.
+                Thread.sleep(10 - (int) millis(cycleStart));
+
+            millis = millis(cycleStart);
+
+            System.out.println("CYCLE: " + millis + " millis ");
+        }
+
+//        for (ActorRef<Spaceship.SpaceshipMessage> s : ships)
+//            LocalActorUtil.join(s);
     }
 
     public long now() {
