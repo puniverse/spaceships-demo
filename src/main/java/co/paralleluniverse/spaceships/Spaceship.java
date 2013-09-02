@@ -98,24 +98,24 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
     // The public state is only updated by the owning Spaceship, and only in a SB transaction.
     // Therefore the owning spaceship can read it any time, but anyone else (other spacehips or the renderer) must only do so in
     // a transaction.
-    public static class State extends DynamicRecord<SpaceshipState> {
+    private static class State extends DynamicRecord<SpaceshipState> {
         private static final MethodHandles.Lookup lookup = MethodHandles.lookup();
         
-        public ActorRef<SpaceshipMessage> spaceship;
-        public SpatialToken token;
-        Status status = Status.ALIVE;
+        private ActorRef<SpaceshipMessage> spaceship;
+        private SpatialToken token;
+        private Status status = Status.ALIVE;
         private long lastMoved = -1L;
-        public double x;
+        private double x;
         private double y;
-        public double vx;
+        private double vx;
         private double vy;
-        public double ax;
+        private double ax;
         private double ay;
-        public double exVx = 0;
+        private double exVx = 0;
         private double exVy = 0;
-        public long timeFired = 0;
+        private long timeFired = 0;
         private long blowTime = 0;
-        public double shotLength = 10f;
+        private double shotLength = 10f;
         private int timesHit = 0;
 
         public AABB getAABB() {
@@ -139,57 +139,57 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
             return SpaceshipState.FIELDS;
         }
 
-//        @Override
-//        public long get(LongField<? super SpaceshipState> field) {
-//            switch (field.id()) {
-//                case 0:
-//                    return lastMoved;
-//                case 1:
-//                    return timeFired;
-//                case 2:
-//                    return blowTime;
-//                default:
-//                    return super.get(field);
-//            }
-//        }
-//
-//        @Override
-//        public double get(DoubleField<? super SpaceshipState> field) {
-//            switch (field.id()) {
-//                case 3:
-//                    return shotLength;
-//                case 4:
-//                    return x;
-//                case 5:
-//                    return y;
-//                case 6:
-//                    return vx;
-//                case 7:
-//                    return vy;
-//                case 8:
-//                    return ax;
-//                case 9:
-//                    return ay;
-//                case 10:
-//                    return exVx;
-//                case 11:
-//                    return exVy;
-//                default:
-//                    return super.get(field);
-//            }
-//        }
-//
-//        @Override
-//        public <V> V get(ObjectField<? super SpaceshipState, V> field) {
-//            switch (field.id()) {
-//                case 12:
-//                    return (V) token;
-//                case 13:
-//                    return (V) spaceship;
-//                default:
-//                    return super.get(field);
-//            }
-//        }
+        @Override
+        public long get(LongField<? super SpaceshipState> field) {
+            switch (field.id()) {
+                case 0:
+                    return lastMoved;
+                case 1:
+                    return timeFired;
+                case 2:
+                    return blowTime;
+                default:
+                    return super.get(field);
+            }
+        }
+
+        @Override
+        public double get(DoubleField<? super SpaceshipState> field) {
+            switch (field.id()) {
+                case 3:
+                    return shotLength;
+                case 4:
+                    return x;
+                case 5:
+                    return y;
+                case 6:
+                    return vx;
+                case 7:
+                    return vy;
+                case 8:
+                    return ax;
+                case 9:
+                    return ay;
+                case 10:
+                    return exVx;
+                case 11:
+                    return exVy;
+                default:
+                    return super.get(field);
+            }
+        }
+
+        @Override
+        public <V> V get(ObjectField<? super SpaceshipState, V> field) {
+            switch (field.id()) {
+                case 12:
+                    return (V) token;
+                case 13:
+                    return (V) spaceship;
+                default:
+                    return super.get(field);
+            }
+        }
 
         @Override
         public String toString() {

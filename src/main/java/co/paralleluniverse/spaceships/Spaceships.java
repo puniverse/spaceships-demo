@@ -176,6 +176,8 @@ public class Spaceships {
      * Main loop: loops over all spaceships and initiates each spaceship's actions. Simulates an IO thread receiving commands over the net.
      */
     private void run() throws Exception {
+        
+        
         ActorRef<Spaceship.SpaceshipMessage>[] ships = new ActorRef[N];
         Phaser phaser = new Phaser();
         for (int i = 0; i < N; i++) {
