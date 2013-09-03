@@ -29,6 +29,7 @@ import co.paralleluniverse.common.record.Field.DoubleField;
 import co.paralleluniverse.common.record.Field.LongField;
 import co.paralleluniverse.common.record.Field.ObjectField;
 import co.paralleluniverse.common.record.Record;
+import co.paralleluniverse.common.record.Records;
 import co.paralleluniverse.common.util.Debug;
 import co.paralleluniverse.fibers.SuspendExecution;
 import co.paralleluniverse.spacebase.AABB;
@@ -139,57 +140,57 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
             return SpaceshipState.FIELDS;
         }
 
-        @Override
-        public long get(LongField<? super SpaceshipState> field) {
-            switch (field.id()) {
-                case 0:
-                    return lastMoved;
-                case 1:
-                    return timeFired;
-                case 2:
-                    return blowTime;
-                default:
-                    return super.get(field);
-            }
-        }
-
-        @Override
-        public double get(DoubleField<? super SpaceshipState> field) {
-            switch (field.id()) {
-                case 3:
-                    return shotLength;
-                case 4:
-                    return x;
-                case 5:
-                    return y;
-                case 6:
-                    return vx;
-                case 7:
-                    return vy;
-                case 8:
-                    return ax;
-                case 9:
-                    return ay;
-                case 10:
-                    return exVx;
-                case 11:
-                    return exVy;
-                default:
-                    return super.get(field);
-            }
-        }
-
-        @Override
-        public <V> V get(ObjectField<? super SpaceshipState, V> field) {
-            switch (field.id()) {
-                case 12:
-                    return (V) token;
-                case 13:
-                    return (V) spaceship;
-                default:
-                    return super.get(field);
-            }
-        }
+//        @Override
+//        public long get(LongField<? super SpaceshipState> field) {
+//            switch (field.id()) {
+//                case 0:
+//                    return lastMoved;
+//                case 1:
+//                    return timeFired;
+//                case 2:
+//                    return blowTime;
+//                default:
+//                    return super.get(field);
+//            }
+//        }
+//
+//        @Override
+//        public double get(DoubleField<? super SpaceshipState> field) {
+//            switch (field.id()) {
+//                case 3:
+//                    return shotLength;
+//                case 4:
+//                    return x;
+//                case 5:
+//                    return y;
+//                case 6:
+//                    return vx;
+//                case 7:
+//                    return vy;
+//                case 8:
+//                    return ax;
+//                case 9:
+//                    return ay;
+//                case 10:
+//                    return exVx;
+//                case 11:
+//                    return exVy;
+//                default:
+//                    return super.get(field);
+//            }
+//        }
+//
+//        @Override
+//        public <V> V get(ObjectField<? super SpaceshipState, V> field) {
+//            switch (field.id()) {
+//                case 12:
+//                    return (V) token;
+//                case 13:
+//                    return (V) spaceship;
+//                default:
+//                    return super.get(field);
+//            }
+//        }
 
         @Override
         public String toString() {
@@ -243,7 +244,7 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
     protected Void doRun() throws InterruptedException, SuspendExecution {
 //        phaser.register();
         state.spaceship = ref();
-        state.token = global.sb.insert(this.state, state.getAABB());
+        state.token = global.sb.insert(Records.delegate(this, state), state.getAABB());
         try {
             record(1, "Spaceship", "doRun", "%s: aaaaa", this);
             for (int i = 0;; i++) {
@@ -282,7 +283,7 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
 
                             assert rs.getResultForUpdate().size() <= 1;
                             for (final ElementUpdater<Record<SpaceshipState>> updater : rs.getResultForUpdate()) {
-                                assert updater.elem() == state;
+                                assert updater.elem().equals(state);
 
                                 move(now);
                                 state.status = status;
