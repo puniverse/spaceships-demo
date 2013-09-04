@@ -20,46 +20,35 @@
 package co.paralleluniverse.spaceships;
 
 import co.paralleluniverse.actors.ActorRef;
-import co.paralleluniverse.common.record.Field;
 import co.paralleluniverse.common.record.Field.DoubleField;
 import co.paralleluniverse.common.record.Field.LongField;
 import co.paralleluniverse.common.record.Field.ObjectField;
+import co.paralleluniverse.common.record.Records;
+import co.paralleluniverse.common.record.SimpleRecordType;
 import co.paralleluniverse.spacebase.SpatialToken;
-import com.google.common.collect.ImmutableSet;
-import java.util.Set;
 
 /**
  *
  * @author pron
  */
 public final class SpaceshipState {
-    public static final LongField<SpaceshipState> $lastMoved = Field.longField("lastMoved", 0); // 0
-    public static final LongField<SpaceshipState> $timeFired = Field.longField("timeFired", 1); // 1
-    public static final LongField<SpaceshipState> $blowTime = Field.longField("blowTime", 2); // 2
-    public static final DoubleField<SpaceshipState> $shotLength = Field.doubleField("shotLength", 3); // 3
-    public static final DoubleField<SpaceshipState> $x = Field.doubleField("x", 4); // 4
-    public static final DoubleField<SpaceshipState> $y = Field.doubleField("y", 5); // 5
-    public static final DoubleField<SpaceshipState> $vx = Field.doubleField("vx", 6); // 6
-    public static final DoubleField<SpaceshipState> $vy = Field.doubleField("vy", 7); // 7
-    public static final DoubleField<SpaceshipState> $ax = Field.doubleField("ax", 8); // 8
-    public static final DoubleField<SpaceshipState> $ay = Field.doubleField("ay", 8); // 9
-    public static final DoubleField<SpaceshipState> $exVx = Field.doubleField("exVx", 10); // 10
-    public static final DoubleField<SpaceshipState> $exVy = Field.doubleField("exVy", 11); // 11
-    public static final ObjectField<SpaceshipState, SpatialToken> $token = Field.objectField("token", SpatialToken.class, 12); // 12
-    public static final ObjectField<SpaceshipState, ActorRef<Spaceship.SpaceshipMessage>> $spaceship = (ObjectField)Field.objectField("spaceship", ActorRef.class, 13); // 13
-    //
-    public static final Set FIELDS = ImmutableSet.of(
-            $lastMoved,
-            $timeFired,
-            $blowTime,
-            $shotLength,
-            $x, $y,
-            $vx, $vy,
-            $ax, $ay,
-            $exVx, $exVy,
-            $token,
-            $spaceship);
-    
+    public static final SimpleRecordType<SpaceshipState> stateType = Records.newSimpleRecordType();
+    public static final LongField<SpaceshipState> $lastMoved = stateType.longField("lastMoved");
+    public static final LongField<SpaceshipState> $timeFired = stateType.longField("timeFired");
+    public static final LongField<SpaceshipState> $blowTime = stateType.longField("blowTime");
+    public static final DoubleField<SpaceshipState> $shotLength = stateType.doubleField("shotLength");
+    public static final DoubleField<SpaceshipState> $x = stateType.doubleField("x");
+    public static final DoubleField<SpaceshipState> $y = stateType.doubleField("y");
+    public static final DoubleField<SpaceshipState> $vx = stateType.doubleField("vx");
+    public static final DoubleField<SpaceshipState> $vy = stateType.doubleField("vy");
+    public static final DoubleField<SpaceshipState> $ax = stateType.doubleField("ax");
+    public static final DoubleField<SpaceshipState> $ay = stateType.doubleField("ay");
+    public static final DoubleField<SpaceshipState> $exVx = stateType.doubleField("exVx");
+    public static final DoubleField<SpaceshipState> $exVy = stateType.doubleField("exVy");
+    public static final ObjectField<SpaceshipState, Spaceship.Status> $status = stateType.objectField("status", Spaceship.Status.class);
+    public static final ObjectField<SpaceshipState, SpatialToken> $token = stateType.objectField("token", SpatialToken.class);
+    public static final ObjectField<SpaceshipState, ActorRef<Spaceship.SpaceshipMessage>> $spaceship = (ObjectField)stateType.objectField("spaceship", ActorRef.class);
+
     private SpaceshipState() {
     }
 }
