@@ -92,6 +92,7 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
     // "external velocity" does not result from thruster (but from nearby explosions or by getting hit), and threfore does not affect heading
     private long exVelocityUpdated = 0;
 
+    // state is accessed by other ships and the renderer through stateRecord
     private static class State {
         ActorRef<SpaceshipMessage> spaceship;
         SpatialToken token;
@@ -100,15 +101,15 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
         double x;
         double y;
         double vx;
-        private double vy;
-        private double ax;
-        private double ay;
-        private double exVx = 0;
-        private double exVy = 0;
-        private long timeFired = 0;
-        private long blowTime = 0;
-        private double shotLength = 10f;
-        private int timesHit = 0;
+        double vy;
+        double ax;
+        double ay;
+        double exVx = 0;
+        double exVy = 0;
+        long timeFired = 0;
+        long blowTime = 0;
+        double shotLength = 10f;
+        int timesHit = 0;
     }
     // The public state is only updated by the owning Spaceship, and only in a SB transaction.
     // Therefore the owning spaceship can read it any time, but anyone else (other spacehips or the renderer) must only do so in
