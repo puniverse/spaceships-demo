@@ -23,9 +23,9 @@ import co.paralleluniverse.actors.ActorRef;
 import co.paralleluniverse.actors.BasicActor;
 import co.paralleluniverse.actors.MailboxConfig;
 import co.paralleluniverse.common.util.Debug;
-import co.paralleluniverse.data.record.DynamicRecordType;
 import co.paralleluniverse.data.record.Record;
 import co.paralleluniverse.data.record.Records;
+import co.paralleluniverse.data.record.RecordType;
 import co.paralleluniverse.fibers.SuspendExecution;
 import co.paralleluniverse.spacebase.AABB;
 import static co.paralleluniverse.spacebase.AABB.X;
@@ -138,7 +138,7 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
         super(new MailboxConfig(10, Channels.OverflowPolicy.THROW));
         this.id = id;
         this.state = new State();
-        this.stateRecord = Records.delegate(this, SpaceshipState.stateType.newInstance(state, DynamicRecordType.Mode.UNSAFE));
+        this.stateRecord = Records.delegate(this, SpaceshipState.stateType.newInstance(state, RecordType.Mode.UNSAFE));
         this.phaser = phaser;
 
         this.global = global;

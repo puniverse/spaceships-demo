@@ -20,11 +20,11 @@
 package co.paralleluniverse.spaceships;
 
 import co.paralleluniverse.actors.ActorRef;
-import co.paralleluniverse.data.record.DynamicRecordType;
 import co.paralleluniverse.data.record.Field.DoubleField;
 import co.paralleluniverse.data.record.Field.LongField;
 import co.paralleluniverse.data.record.Field.ObjectField;
 import co.paralleluniverse.data.record.Records;
+import co.paralleluniverse.data.record.RecordType;
 import co.paralleluniverse.spacebase.SpatialToken;
 
 /**
@@ -32,7 +32,7 @@ import co.paralleluniverse.spacebase.SpatialToken;
  * @author pron
  */
 public final class SpaceshipState {
-    public static final DynamicRecordType<SpaceshipState> stateType = Records.newDynamicRecordType();
+    public static final RecordType<SpaceshipState> stateType = new RecordType<>();
     public static final LongField<SpaceshipState> $lastMoved = stateType.longField("lastMoved");
     public static final LongField<SpaceshipState> $timeFired = stateType.longField("timeFired");
     public static final LongField<SpaceshipState> $blowTime = stateType.longField("blowTime");
@@ -47,7 +47,7 @@ public final class SpaceshipState {
     public static final DoubleField<SpaceshipState> $exVy = stateType.doubleField("exVy");
     public static final ObjectField<SpaceshipState, Spaceship.Status> $status = stateType.objectField("status", Spaceship.Status.class);
     public static final ObjectField<SpaceshipState, SpatialToken> $token = stateType.objectField("token", SpatialToken.class);
-    public static final ObjectField<SpaceshipState, ActorRef<Spaceship.SpaceshipMessage>> $spaceship = (ObjectField)stateType.objectField("spaceship", ActorRef.class);
+    public static final ObjectField<SpaceshipState, ActorRef<Spaceship.SpaceshipMessage>> $spaceship = (ObjectField) stateType.objectField("spaceship", ActorRef.class);
 
     private SpaceshipState() {
     }
