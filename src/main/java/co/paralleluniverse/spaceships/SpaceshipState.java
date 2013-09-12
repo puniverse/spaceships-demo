@@ -20,11 +20,11 @@
 package co.paralleluniverse.spaceships;
 
 import co.paralleluniverse.actors.ActorRef;
-import co.paralleluniverse.common.record.Field.DoubleField;
-import co.paralleluniverse.common.record.Field.LongField;
-import co.paralleluniverse.common.record.Field.ObjectField;
-import co.paralleluniverse.common.record.Records;
-import co.paralleluniverse.common.record.SimpleRecordType;
+import co.paralleluniverse.data.record.DynamicRecordType;
+import co.paralleluniverse.data.record.Field.DoubleField;
+import co.paralleluniverse.data.record.Field.LongField;
+import co.paralleluniverse.data.record.Field.ObjectField;
+import co.paralleluniverse.data.record.Records;
 import co.paralleluniverse.spacebase.SpatialToken;
 
 /**
@@ -32,7 +32,7 @@ import co.paralleluniverse.spacebase.SpatialToken;
  * @author pron
  */
 public final class SpaceshipState {
-    public static final SimpleRecordType<SpaceshipState> stateType = Records.newSimpleRecordType();
+    public static final DynamicRecordType<SpaceshipState> stateType = Records.newDynamicRecordType();
     public static final LongField<SpaceshipState> $lastMoved = stateType.longField("lastMoved");
     public static final LongField<SpaceshipState> $timeFired = stateType.longField("timeFired");
     public static final LongField<SpaceshipState> $blowTime = stateType.longField("blowTime");

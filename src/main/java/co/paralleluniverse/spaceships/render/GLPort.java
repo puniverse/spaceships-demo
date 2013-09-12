@@ -19,7 +19,7 @@
  */
 package co.paralleluniverse.spaceships.render;
 
-import co.paralleluniverse.common.record.Record;
+import co.paralleluniverse.data.record.Record;
 import co.paralleluniverse.spacebase.AABB;
 import static co.paralleluniverse.spacebase.AABB.X;
 import static co.paralleluniverse.spacebase.AABB.Y;

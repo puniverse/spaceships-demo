@@ -22,7 +22,7 @@ package co.paralleluniverse.spaceships;
 import co.paralleluniverse.actors.ActorRef;
 import co.paralleluniverse.actors.LocalActorUtil;
 import co.paralleluniverse.common.monitoring.Metrics;
-import co.paralleluniverse.common.record.Record;
+import co.paralleluniverse.data.record.Record;
 import co.paralleluniverse.common.util.Debug;
 import co.paralleluniverse.spacebase.AABB;
 import co.paralleluniverse.spacebase.quasar.SpaceBase;
