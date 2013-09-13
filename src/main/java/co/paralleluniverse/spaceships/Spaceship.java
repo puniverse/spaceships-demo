@@ -138,7 +138,7 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
         super(new MailboxConfig(10, Channels.OverflowPolicy.THROW));
         this.id = id;
         this.state = new State();
-        this.stateRecord = Records.delegate(this, SpaceshipState.stateType.newInstance(state, RecordType.Mode.UNSAFE));
+        this.stateRecord = Records.delegate(this, SpaceshipState.stateType.newInstance(state));
         this.phaser = phaser;
 
         this.global = global;
