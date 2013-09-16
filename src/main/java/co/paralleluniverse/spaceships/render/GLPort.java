@@ -20,6 +20,7 @@
 package co.paralleluniverse.spaceships.render;
 
 import co.paralleluniverse.data.record.Record;
+import co.paralleluniverse.data.record.Records;
 import co.paralleluniverse.spacebase.AABB;
 import static co.paralleluniverse.spacebase.AABB.X;
 import static co.paralleluniverse.spacebase.AABB.Y;
@@ -128,7 +129,6 @@ public class GLPort implements GLEventListener {
     private long lastDispTime = 0;
     private final AtomicInteger indexGen = new AtomicInteger();
     private final Record<SpaceshipState>[] ships;
-    private final long[] data;
 
     static {
         GLProfile.initSingleton();
@@ -141,8 +141,9 @@ public class GLPort implements GLEventListener {
         this.sb = global.getPlainSpaceBase();
         this.bounds = bounds;
 
-        this.data = new long[maxItems * ITEM_SIZE];
         this.ships = new Record[maxItems];
+        for(int i=0; i<ships.length; i++) 
+            ships[i] = SpaceshipState.stateType.newInstance();
 
         final GLProfile glp = GLProfile.get(GLProfile.GL3);
         final GLCapabilitiesImmutable glcaps = (GLCapabilitiesImmutable) new GLCapabilities(glp);
@@ -355,7 +356,7 @@ public class GLPort implements GLEventListener {
             // put the shotLength (0 for ship that's not firing)
             colorsb.put(now - s.get($timeFired) < SHOOT_DURATION ? (float) s.get($shotLength) : 0f);
 
-            if (portContains(i))
+            if (portContains(s.get($x), s.get($y)))
                 countInPort++;
         }
         setTitle("" + countInPort + " Spaceships " + (int) (port.max(X) - port.min(X)) + "x" + (int) (port.max(Y) - port.min(Y)));
@@ -399,8 +400,7 @@ public class GLPort implements GLEventListener {
                     return;
 
                 final int index = indexGen.getAndIncrement();
-                ships[index] = s;
-                //s.getCurrentData(currentTime, data, getDataIndex(index, 0));
+                Records.copy(s, ships[index]);
             }
 
             @Override
@@ -412,86 +412,89 @@ public class GLPort implements GLEventListener {
         if (count < lastCount) {
             // clear arrays
             Arrays.fill(ships, count, lastCount, null);
-            Arrays.fill(data, count * ITEM_SIZE, lastCount * ITEM_SIZE, 0);
         }
         return count;
     }
 
-    private int extrapolate(final long currentTime) {
-        final int count = indexGen.get();
-        double duration = (double) (currentTime - lastDispTime) / TimeUnit.SECONDS.toMillis(1);
-        double duration2 = duration * duration;
-
-        for (int i = 0; i < count; i++) {
-            double x = getDataDouble(i, LX);
-            double y = getDataDouble(i, LY);
-            double vx = getDataDouble(i, VX);
-            double vy = getDataDouble(i, VY);
-            double ax = getDataDouble(i, AX);
-            double ay = getDataDouble(i, AY);
-
-            x = x + vx * duration + ax * duration2;
-            y = y + vy * duration + ay * duration2;
-            vx = vx + ax * duration;
-            vy = vy + ay * duration;
-
-            setDataDouble(i, LX, x);
-            setDataDouble(i, LY, y);
-            setDataDouble(i, VX, vx);
-            setDataDouble(i, VY, vy);
-        }
-        return count;
-    }
-
-    private void copy(int index, Record<SpaceshipState> state) {
-        setDataLong(index, LAST_MOVED, state.get(SpaceshipState.$lastMoved));
-        setDataDouble(index, LX, state.get($x));
-        setDataDouble(index, LY, state.get($y));
-        setDataDouble(index, VX, state.get($vx));
-        setDataDouble(index, VY, state.get($vy));
-        setDataDouble(index, EVX, state.get($exVx));
-        setDataDouble(index, EVY, state.get($exVy));
-        setDataDouble(index, AX, state.get($ax));
-        setDataDouble(index, AY, state.get($ay));
-        setDataLong(index, SHOT_TIME, state.get($timeFired));
-        setDataLong(index, BLOW_TIME, state.get($blowTime));
-        setDataDouble(index, SHOT_LENGTH, state.get($shotLength));
-    }
-
-    private boolean portContains(int index) {
-        final double x = data[getDataIndex(index, LX)];
-        final double y = data[getDataIndex(index, LY)];
+    private boolean portContains(double x, double y) {
         return x >= port.min(X) && x <= port.max(X)
                 && y >= port.min(Y) && y <= port.max(Y);
     }
+//    private int extrapolate(final long currentTime) {
+//        final int count = indexGen.get();
+//        double duration = (double) (currentTime - lastDispTime) / TimeUnit.SECONDS.toMillis(1);
+//        double duration2 = duration * duration;
+//
+//        for (int i = 0; i < count; i++) {
+//            double x = getDataDouble(i, LX);
+//            double y = getDataDouble(i, LY);
+//            double vx = getDataDouble(i, VX);
+//            double vy = getDataDouble(i, VY);
+//            double ax = getDataDouble(i, AX);
+//            double ay = getDataDouble(i, AY);
+//
+//            x = x + vx * duration + ax * duration2;
+//            y = y + vy * duration + ay * duration2;
+//            vx = vx + ax * duration;
+//            vy = vy + ay * duration;
+//
+//            setDataDouble(i, LX, x);
+//            setDataDouble(i, LY, y);
+//            setDataDouble(i, VX, vx);
+//            setDataDouble(i, VY, vy);
+//        }
+//        return count;
+//    }
 
-    private int getDataIndex(int index, int offset) {
-        return index * ITEM_SIZE + offset;
-    }
-
-    private void setDataLong(int index, int offset, long val) {
-        data[index * ITEM_SIZE + offset] = val;
-    }
-
-    private long getDataLong(int index, int offset) {
-        return data[index * ITEM_SIZE + offset];
-    }
-
-    private void setDataDouble(int index, int offset, double val) {
-        setDataLong(index, offset, Double.doubleToRawLongBits(val));
-        //data[index * ITEM_SIZE + offset] = val;
-    }
-
-    private double getDataDouble(int index, int offset) {
-        return Double.longBitsToDouble(getDataLong(index, offset));
-        //return data[index * ITEM_SIZE + offset];
-    }
-
-    public double getHeading(int index) {
-        final double vx = getDataDouble(index, VX);
-        final double vy = getDataDouble(index, VY);
-        return Math.atan2(vx, vy);
-    }
+//    private void copy(int index, Record<SpaceshipState> state) {
+//        setDataLong(index, LAST_MOVED, state.get(SpaceshipState.$lastMoved));
+//        setDataDouble(index, LX, state.get($x));
+//        setDataDouble(index, LY, state.get($y));
+//        setDataDouble(index, VX, state.get($vx));
+//        setDataDouble(index, VY, state.get($vy));
+//        setDataDouble(index, EVX, state.get($exVx));
+//        setDataDouble(index, EVY, state.get($exVy));
+//        setDataDouble(index, AX, state.get($ax));
+//        setDataDouble(index, AY, state.get($ay));
+//        setDataLong(index, SHOT_TIME, state.get($timeFired));
+//        setDataLong(index, BLOW_TIME, state.get($blowTime));
+//        setDataDouble(index, SHOT_LENGTH, state.get($shotLength));
+//    }
+//
+//    private boolean portContains(int index) {
+//        final double x = data[getDataIndex(index, LX)];
+//        final double y = data[getDataIndex(index, LY)];
+//        return x >= port.min(X) && x <= port.max(X)
+//                && y >= port.min(Y) && y <= port.max(Y);
+//    }
+//
+//    private int getDataIndex(int index, int offset) {
+//        return index * ITEM_SIZE + offset;
+//    }
+//
+//    private void setDataLong(int index, int offset, long val) {
+//        data[index * ITEM_SIZE + offset] = val;
+//    }
+//
+//    private long getDataLong(int index, int offset) {
+//        return data[index * ITEM_SIZE + offset];
+//    }
+//
+//    private void setDataDouble(int index, int offset, double val) {
+//        setDataLong(index, offset, Double.doubleToRawLongBits(val));
+//        //data[index * ITEM_SIZE + offset] = val;
+//    }
+//
+//    private double getDataDouble(int index, int offset) {
+//        return Double.longBitsToDouble(getDataLong(index, offset));
+//        //return data[index * ITEM_SIZE + offset];
+//    }
+//
+//    public double getHeading(int index) {
+//        final double vx = getDataDouble(index, VX);
+//        final double vy = getDataDouble(index, VY);
+//        return Math.atan2(vx, vy);
+//    }
 
     private void movePort(boolean horizontal, double units) {
         //pmv.glMatrixMode(GLMatrixFunc.GL_MODELVIEW);

@@ -26,6 +26,7 @@ import co.paralleluniverse.common.util.Debug;
 import co.paralleluniverse.data.record.Record;
 import co.paralleluniverse.data.record.Records;
 import co.paralleluniverse.data.record.RecordType;
+import co.paralleluniverse.db.record.TransactionalRecord;
 import co.paralleluniverse.fibers.SuspendExecution;
 import co.paralleluniverse.spacebase.AABB;
 import static co.paralleluniverse.spacebase.AABB.X;
@@ -114,6 +115,7 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
     // The public state is only updated by the owning Spaceship, and only in a SB transaction.
     // Therefore the owning spaceship can read it any time, but anyone else (other spacehips or the renderer) must only do so in
     // a transaction.
+
     public static void getCurrentLocation(Record<SpaceshipState> s, long currentTime, FloatBuffer buffer) {
         final double duration = (double) (currentTime - s.get($lastMoved)) / TimeUnit.SECONDS.toMillis(1);
         final double duration2 = duration * duration;
@@ -177,7 +179,7 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
     protected Void doRun() throws InterruptedException, SuspendExecution {
 //        phaser.register();
         state.spaceship = ref();
-        state.token = global.sb.insert(stateRecord, getAABB());
+        state.token = global.sb.insert(new TransactionalRecord<>(stateRecord), getAABB());
         try {
             record(1, "Spaceship", "doRun", "%s: aaaaa", this);
             for (int i = 0;; i++) {
@@ -263,6 +265,7 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
             for (Record<SpaceshipState> s : rs.getResultReadOnly()) {
                 final double dx = s.get($x) - state.x;
                 final double dy = s.get($y) - state.y;
+
                 double rng2 = dx * dx + dy * dy;
                 if (rng2 > 100 & rng2 <= minRange2) { //not me and not so close
                     minRange2 = rng2;
@@ -272,7 +275,7 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
             if (nearestShip != null)
                 lockOnTarget(nearestShip);
             record(1, "Spaceship", "searchForTargets", "%s: size of radar query: %d", this, rs.getResultReadOnly().size());
-        }
+        }  
     }
 
     private void chaseAndShoot() throws SuspendExecution, InterruptedException {
