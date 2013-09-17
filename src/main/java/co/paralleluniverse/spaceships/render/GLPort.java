@@ -142,7 +142,7 @@ public class GLPort implements GLEventListener {
         this.bounds = bounds;
 
         this.ships = new Record[maxItems];
-        for(int i=0; i<ships.length; i++) 
+        for (int i = 0; i < ships.length; i++)
             ships[i] = SpaceshipState.stateType.newInstance();
 
         final GLProfile glp = GLProfile.get(GLProfile.GL3);
@@ -409,10 +409,10 @@ public class GLPort implements GLEventListener {
         });
         final int count = indexGen.get();
 
-        if (count < lastCount) {
-            // clear arrays
-            Arrays.fill(ships, count, lastCount, null);
-        }
+        // clear arrays
+        for (int i = count; i < lastCount; i++)
+            Records.clear(ships[i]);
+
         return count;
     }
 
@@ -495,7 +495,6 @@ public class GLPort implements GLEventListener {
 //        final double vy = getDataDouble(index, VY);
 //        return Math.atan2(vx, vy);
 //    }
-
     private void movePort(boolean horizontal, double units) {
         //pmv.glMatrixMode(GLMatrixFunc.GL_MODELVIEW);
         final long ct = System.currentTimeMillis();

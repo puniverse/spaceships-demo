@@ -20,10 +20,15 @@
 package co.paralleluniverse.spaceships;
 
 import co.paralleluniverse.actors.ActorRef;
+import co.paralleluniverse.actors.ActorSpec;
+import co.paralleluniverse.actors.ActorUtil;
 import co.paralleluniverse.actors.LocalActorUtil;
+import co.paralleluniverse.actors.behaviors.Supervisor;
+import co.paralleluniverse.actors.behaviors.SupervisorActor;
 import co.paralleluniverse.common.monitoring.Metrics;
 import co.paralleluniverse.data.record.Record;
 import co.paralleluniverse.common.util.Debug;
+import co.paralleluniverse.fibers.SuspendExecution;
 import co.paralleluniverse.spacebase.AABB;
 import co.paralleluniverse.spacebase.quasar.SpaceBase;
 import co.paralleluniverse.spacebase.quasar.SpaceBaseBuilder;
@@ -176,36 +181,41 @@ public class Spaceships {
      * Main loop: loops over all spaceships and initiates each spaceship's actions. Simulates an IO thread receiving commands over the net.
      */
     private void run() throws Exception {
-        
-        
-        ActorRef<Spaceship.SpaceshipMessage>[] ships = new ActorRef[N];
-        Phaser phaser = new Phaser();
-        for (int i = 0; i < N; i++) {
-            ships[i] = new Spaceship(this, i, phaser).spawn();
-        }
+        final Phaser phaser = new Phaser();
+
+        final Supervisor sup = new SupervisorActor(SupervisorActor.RestartStrategy.ONE_FOR_ONE) {
+            @Override
+            protected void init() throws InterruptedException, SuspendExecution {
+                for (int i = 0; i < N; i++)
+                    addChild(new Supervisor.ChildSpec("ship-" + i, Supervisor.ChildMode.PERMANENT, 5, 1, TimeUnit.SECONDS, 3, ActorSpec.of(Spaceship.class, Spaceships.this, i, phaser)));
+            }
+        }.spawn();
 
         Thread.sleep(3000);
         port = new GLPort(toolkit, N, Spaceships.this, bounds);
 
-        if (timeStream != null)
-            timeStream.println("# time, millis, millis1, millis0");
-
-        for (int k = 0;; k++) {
-            cycleStart = System.nanoTime();
-
-            phaser.awaitAdvance(k);
-
-            float millis = millis(cycleStart);
-            if (timeStream != null)
-                timeStream.println(k + "," + millis);
-
-            if (millis(cycleStart) < 10) // don't work too hard: if the cycle has taken less than 10 millis, wait a little.
-                Thread.sleep(10 - (int) millis(cycleStart));
-
-            millis = millis(cycleStart);
-
-            System.out.println("CYCLE: " + millis + " millis ");
-        }
+        LocalActorUtil.join(sup);
+        System.exit(1);
+        
+//        if (timeStream != null)
+//            timeStream.println("# time, millis, millis1, millis0");
+//
+//        for (int k = 0;; k++) {
+//            cycleStart = System.nanoTime();
+//
+//            phaser.awaitAdvance(k);
+//
+//            float millis = millis(cycleStart);
+//            if (timeStream != null)
+//                timeStream.println(k + "," + millis);
+//
+//            if (millis(cycleStart) < 10) // don't work too hard: if the cycle has taken less than 10 millis, wait a little.
+//                Thread.sleep(10 - (int) millis(cycleStart));
+//
+//            millis = millis(cycleStart);
+//
+//            System.out.println("CYCLE: " + millis + " millis ");
+//        }
 
 //        for (ActorRef<Spaceship.SpaceshipMessage> s : ships)
 //            LocalActorUtil.join(s);
