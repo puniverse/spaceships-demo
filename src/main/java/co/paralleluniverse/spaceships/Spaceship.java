@@ -179,7 +179,7 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
     protected Void doRun() throws InterruptedException, SuspendExecution {
 //        phaser.register();
         state.spaceship = ref();
-        state.token = global.sb.insert(new TransactionalRecord<>(stateRecord), getAABB());
+        state.token = global.sb.insert(new TransactionalRecord<>(this, stateRecord), getAABB());
         try {
             record(1, "Spaceship", "doRun", "%s: aaaaa", this);
             for (int i = 0;; i++) {
