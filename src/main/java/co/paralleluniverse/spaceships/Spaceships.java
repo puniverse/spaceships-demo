@@ -28,7 +28,7 @@ import co.paralleluniverse.actors.behaviors.SupervisorActor;
 import co.paralleluniverse.common.monitoring.Metrics;
 import co.paralleluniverse.data.record.Record;
 import co.paralleluniverse.common.util.Debug;
-import co.paralleluniverse.fibers.SuspendExecution;
+import co.paralleluniverse.fibers.*;
 import co.paralleluniverse.spacebase.AABB;
 import co.paralleluniverse.spacebase.quasar.SpaceBase;
 import co.paralleluniverse.spacebase.quasar.SpaceBaseBuilder;
@@ -192,7 +192,7 @@ public class Spaceships {
         }.spawn();
 
         Thread.sleep(3000);
-        port = new GLPort(toolkit, N, Spaceships.this, bounds);
+        port = new GLPort(toolkit, N + 20, Spaceships.this, bounds);
 
         LocalActorUtil.join(sup);
         System.exit(1);

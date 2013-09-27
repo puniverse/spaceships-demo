@@ -25,9 +25,8 @@ import co.paralleluniverse.actors.MailboxConfig;
 import co.paralleluniverse.common.util.Debug;
 import co.paralleluniverse.data.record.Record;
 import co.paralleluniverse.data.record.Records;
-import co.paralleluniverse.data.record.RecordType;
 import co.paralleluniverse.db.record.TransactionalRecord;
-import co.paralleluniverse.fibers.SuspendExecution;
+import co.paralleluniverse.fibers.*;
 import co.paralleluniverse.spacebase.AABB;
 import static co.paralleluniverse.spacebase.AABB.X;
 import static co.paralleluniverse.spacebase.AABB.Y;
@@ -156,7 +155,7 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
 
     @Override
     public String toString() {
-        return "Spaceship@" + id;
+        return "Spaceship@" + Integer.toHexString(System.identityHashCode(this)) + '(' + id + ')';
     }
 
     private AABB getAABB() {
@@ -184,7 +183,6 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
             record(1, "Spaceship", "doRun", "%s: aaaaa", this);
             for (int i = 0;; i++) {
                 final long nextMove = state.lastMoved + MIN_PERIOD_MILLIS;
-
                 SpaceshipMessage message = receive(nextMove - now(), TimeUnit.MILLISECONDS);
                 final long now = now();
                 if (message != null) {
@@ -196,7 +194,7 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
                 } else {
                     // no message
                     runDelayed(now); // apply delayed actions
-
+                    
                     if (status == Status.GONE) {
                         record(1, "Spaceship", "doRun", "%s: deleting", this);
                         return null; // explosion has finished
@@ -213,7 +211,7 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
                                         SpatialQueries.range(myAABB, global.range),
                                         SpatialQueries.equals((Record<SpaceshipState>) stateRecord, myAABB), false)) {
 
-                            applyNeighborRejection(rs.getResultReadOnly(), global.now());
+                            applyNeighborRejection(rs.getResultReadOnly(), now);
 
                             assert rs.getResultForUpdate().size() <= 1;
                             for (final ElementUpdater<Record<SpaceshipState>> updater : rs.getResultForUpdate()) {
@@ -238,8 +236,10 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
                             state.ay = 0.0;
                         }
                     }
+                    state.lastMoved = now();
                 }
-                record(1, "Spaceship", "doRun", "%s: iter %s", this, i);
+                if (isRecordingLevel(1))
+                    record(1, "Spaceship", "doRun", "%s: iter %s", this, i);
 //                phaser.arrive();
             }
         } catch (Throwable e) {
@@ -275,7 +275,7 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
             if (nearestShip != null)
                 lockOnTarget(nearestShip);
             record(1, "Spaceship", "searchForTargets", "%s: size of radar query: %d", this, rs.getResultReadOnly().size());
-        }  
+        }
     }
 
     private void chaseAndShoot() throws SuspendExecution, InterruptedException {

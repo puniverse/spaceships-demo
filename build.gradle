@@ -58,11 +58,15 @@ task wrapper(type: Wrapper) {
 }
 
 tasks.withType(JavaExec) {
+//    systemProperty "co.paralleluniverse.debugMode", "true"
+    jvmArgs '-verbose:gc'
+    jvmArgs '-ea'
     jvmArgs '-Xmx1024m'
     jvmArgs "-javaagent:${configurations.quasar.iterator().next()}" // =v, =d
-    jvmArgs '-ea'
-    jvmArgs '-verbose:gc'
-    //    systemProperty "co.paralleluniverse.debugMode", "true"
+    jvmArgs '-XX:+UnlockCommercialFeatures'
+    jvmArgs '-XX:+FlightRecorder'
+    systemProperty "co.paralleluniverse.fibers.DefaultFiberPool.parallelism", "6"
+    systemProperty "co.paralleluniverse.fibers.DefaultFiberPool.monitor", "JMX" // "METRICS" // "NONE" //
     systemProperty "log4j.configurationFile", "${rootProject.projectDir}/log4j.xml"
     systemProperty "Log4jContextSelector", "org.apache.logging.log4j.core.async.AsyncLoggerContextSelector"
     systemProperty "co.paralleluniverse.globalFlightRecorder", "true"

@@ -21,6 +21,7 @@ package co.paralleluniverse.spaceships.render;
 
 import co.paralleluniverse.data.record.Record;
 import co.paralleluniverse.data.record.Records;
+import co.paralleluniverse.fibers.DefaultFiberPool;
 import co.paralleluniverse.spacebase.AABB;
 import static co.paralleluniverse.spacebase.AABB.X;
 import static co.paralleluniverse.spacebase.AABB.Y;
@@ -178,7 +179,7 @@ public class GLPort implements GLEventListener {
         }
 
         drawable.addGLEventListener(this);
-        animator = new FPSAnimator(drawable, 50);
+        animator = new FPSAnimator(drawable, 30);
 
         if (TOOLKIT == Toolkit.NEWT) {
             final GLWindow window = (GLWindow) drawable;
@@ -311,70 +312,76 @@ public class GLPort implements GLEventListener {
 
     @Override
     public void display(GLAutoDrawable drawable) {
-        final GL3 gl = drawable.getGL().getGL3();
-        shaderState.bind(gl);
-        vao.bind(gl);
-        int spaceshipLoc = gl.glGetUniformLocation(shaderProgram.program(), "spaceshipTex");
-        gl.glUniform1i(spaceshipLoc, 0);
-        gl.glActiveTexture(GL.GL_TEXTURE0);
-        gl.glBindTexture(GL.GL_TEXTURE_2D, spaceshipTex.getTextureObject(gl));
+        try {
+            final GL3 gl = drawable.getGL().getGL3();
+            shaderState.bind(gl);
+            vao.bind(gl);
+            int spaceshipLoc = gl.glGetUniformLocation(shaderProgram.program(), "spaceshipTex");
+            gl.glUniform1i(spaceshipLoc, 0);
+            gl.glActiveTexture(GL.GL_TEXTURE0);
+            gl.glBindTexture(GL.GL_TEXTURE_2D, spaceshipTex.getTextureObject(gl));
 
-        int explosionLoc = gl.glGetUniformLocation(shaderProgram.program(), "explosionTex");
-        gl.glUniform1i(explosionLoc, 1);
-        gl.glActiveTexture(GL.GL_TEXTURE0 + 1);
-        gl.glBindTexture(GL.GL_TEXTURE_2D, explosionTex.getTextureObject(gl));
+            int explosionLoc = gl.glGetUniformLocation(shaderProgram.program(), "explosionTex");
+            gl.glUniform1i(explosionLoc, 1);
+            gl.glActiveTexture(GL.GL_TEXTURE0 + 1);
+            gl.glBindTexture(GL.GL_TEXTURE_2D, explosionTex.getTextureObject(gl));
 
-        vertices.clear();
-        colors.clear();
-        final FloatBuffer verticesb = (FloatBuffer) vertices.getBuffer();
-        final FloatBuffer colorsb = (FloatBuffer) colors.getBuffer();
-        long now = global.now();
-        fixPort(now, true);
-        MutableAABB currentPort = getCurrentPort(now);
-        portToMvMatrix(currentPort);
-        double margins = WIDTH_MARGINS;
+            vertices.clear();
+            colors.clear();
+            final FloatBuffer verticesb = (FloatBuffer) vertices.getBuffer();
+            final FloatBuffer colorsb = (FloatBuffer) colors.getBuffer();
+            long now = global.now();
+            fixPort(now, true);
+            MutableAABB currentPort = getCurrentPort(now);
+            portToMvMatrix(currentPort);
+            double margins = WIDTH_MARGINS;
 
-        final int n;
+            final int n;
 //        if (now - lastQueryTime > SB_QUERY_RATE) {
-        n = query(now, SpatialQueries.contained(AABB.create(currentPort.min(X) - margins, currentPort.max(X) + margins, currentPort.min(Y) - margins, currentPort.max(Y) + margins)));
-        lastQueryTime = now;
+            n = query(now, SpatialQueries.contained(AABB.create(currentPort.min(X) - margins, currentPort.max(X) + margins, currentPort.min(Y) - margins, currentPort.max(Y) + margins)));
+            lastQueryTime = now;
 //        } else
 //            n = extrapolate(now);
-        lastDispTime = now;
+            lastDispTime = now;
 
-        int countInPort = 0;
-        for (int i = 0; i < n; i++) {
-            Record<SpaceshipState> s = ships[i];
-            Spaceship.getCurrentLocation(s, now, verticesb);
+            int countInPort = 0;
+            for (int i = 0; i < n; i++) {
+                Record<SpaceshipState> s = ships[i];
+                Spaceship.getCurrentLocation(s, now, verticesb);
 
-            if (s.get($blowTime) > 0)  // 0.01 - start blow animation, 1.0 - end of animation
-                colorsb.put(Math.min(1.0f, (now - s.get($blowTime)) / EXPLOSION_DURATION));
-            else
-                colorsb.put(0); // ship isn't blowing up
-            colorsb.put((float) Spaceship.getCurrentHeading(s, now));
+                if (s.get($blowTime) > 0)  // 0.01 - start blow animation, 1.0 - end of animation
+                    colorsb.put(Math.min(1.0f, (now - s.get($blowTime)) / EXPLOSION_DURATION));
+                else
+                    colorsb.put(0); // ship isn't blowing up
+                colorsb.put((float) Spaceship.getCurrentHeading(s, now));
 
-            // put the shotLength (0 for ship that's not firing)
-            colorsb.put(now - s.get($timeFired) < SHOOT_DURATION ? (float) s.get($shotLength) : 0f);
+                // put the shotLength (0 for ship that's not firing)
+                colorsb.put(now - s.get($timeFired) < SHOOT_DURATION ? (float) s.get($shotLength) : 0f);
 
-            if (portContains(s.get($x), s.get($y)))
-                countInPort++;
+                if (portContains(s.get($x), s.get($y)))
+                    countInPort++;
+            }
+            setTitle("" + countInPort + " Spaceships " + (int) (port.max(X) - port.min(X)) + "x" + (int) (port.max(Y) - port.min(Y)));
+
+            vertices.flip();
+            colors.flip();
+
+            int numElems = verticesb.limit() / 2;
+            vertices.write(gl, 0, numElems);
+            colors.write(gl, 0, numElems);
+
+            shaderState.setUniform(gl, "in_Matrix", 4, 4, pmv.glGetMvMatrixf());
+
+            gl.glClear(GL3.GL_COLOR_BUFFER_BIT);
+            gl.glDrawArrays(GL3.GL_POINTS, 0, numElems);
+
+            vao.unbind(gl);
+            shaderState.unbind(gl);
+        } catch (Throwable t) {
+            System.err.println("XXXXXX");
+            t.printStackTrace();
+            throw t;
         }
-        setTitle("" + countInPort + " Spaceships " + (int) (port.max(X) - port.min(X)) + "x" + (int) (port.max(Y) - port.min(Y)));
-
-        vertices.flip();
-        colors.flip();
-
-        int numElems = verticesb.limit() / 2;
-        vertices.write(gl, 0, numElems);
-        colors.write(gl, 0, numElems);
-
-        shaderState.setUniform(gl, "in_Matrix", 4, 4, pmv.glGetMvMatrixf());
-
-        gl.glClear(GL3.GL_COLOR_BUFFER_BIT);
-        gl.glDrawArrays(GL3.GL_POINTS, 0, numElems);
-
-        vao.unbind(gl);
-        shaderState.unbind(gl);
     }
 
     @Override
@@ -393,6 +400,7 @@ public class GLPort implements GLEventListener {
         final int lastCount = indexGen.get();
         indexGen.set(0);
 
+        final long start = System.nanoTime();
         sb.query(query, new SpatialVisitor<Record<SpaceshipState>>() {
             @Override
             public void visit(Record<SpaceshipState> s, SpatialToken st) {
@@ -407,6 +415,9 @@ public class GLPort implements GLEventListener {
             public void done() {
             }
         });
+        final long elapsedMicroseconds = TimeUnit.MICROSECONDS.convert(System.nanoTime() - start, TimeUnit.NANOSECONDS);
+        System.out.println("=== " + elapsedMicroseconds + " - " + DefaultFiberPool.getInstance().getQueuedSubmissionCount() + " " + DefaultFiberPool.getInstance().getQueuedTaskCount());
+        
         final int count = indexGen.get();
 
         // clear arrays
