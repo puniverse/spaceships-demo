@@ -38,6 +38,7 @@ import co.paralleluniverse.spacebase.SpatialToken;
 import co.paralleluniverse.spacebase.quasar.ElementUpdater1;
 import co.paralleluniverse.spacebase.quasar.ResultSet;
 import static co.paralleluniverse.spaceships.SpaceshipState.*;
+import co.paralleluniverse.strands.Strand;
 import co.paralleluniverse.strands.channels.Channels;
 import static java.lang.Math.*;
 import java.nio.FloatBuffer;
@@ -236,7 +237,7 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
                             state.ay = 0.0;
                         }
                     }
-                    state.lastMoved = now();
+                     state.lastMoved = now();
                 }
                 if (isRecordingLevel(1))
                     record(1, "Spaceship", "doRun", "%s: iter %s", this, i);
