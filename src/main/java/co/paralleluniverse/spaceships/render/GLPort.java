@@ -20,6 +20,7 @@
 package co.paralleluniverse.spaceships.render;
 
 import co.paralleluniverse.data.record.Record;
+import co.paralleluniverse.data.record.RecordArray;
 import co.paralleluniverse.data.record.Records;
 import co.paralleluniverse.fibers.DefaultFiberPool;
 import co.paralleluniverse.spacebase.AABB;
@@ -129,7 +130,7 @@ public class GLPort implements GLEventListener {
     private long lastQueryTime = 0;
     private long lastDispTime = 0;
     private final AtomicInteger indexGen = new AtomicInteger();
-    private final Record<SpaceshipState>[] ships;
+    private final RecordArray<SpaceshipState> ships;
 
     static {
         GLProfile.initSingleton();
@@ -142,9 +143,7 @@ public class GLPort implements GLEventListener {
         this.sb = global.getPlainSpaceBase();
         this.bounds = bounds;
 
-        this.ships = new Record[maxItems];
-        for (int i = 0; i < ships.length; i++)
-            ships[i] = SpaceshipState.stateType.newInstance();
+        this.ships = SpaceshipState.stateType.newArray(maxItems);
 
         final GLProfile glp = GLProfile.get(GLProfile.GL3);
         final GLCapabilitiesImmutable glcaps = (GLCapabilitiesImmutable) new GLCapabilities(glp);
@@ -345,8 +344,7 @@ public class GLPort implements GLEventListener {
             lastDispTime = now;
 
             int countInPort = 0;
-            for (int i = 0; i < n; i++) {
-                Record<SpaceshipState> s = ships[i];
+            for (Record<SpaceshipState> s : ships.slice(0, n)) {
                 Spaceship.getCurrentLocation(s, now, verticesb);
 
                 if (s.get($blowTime) > 0)  // 0.01 - start blow animation, 1.0 - end of animation
@@ -408,7 +406,7 @@ public class GLPort implements GLEventListener {
                     return;
 
                 final int index = indexGen.getAndIncrement();
-                Records.copy(s, ships[index]);
+                Records.copy(s, ships.at(index));
             }
 
             @Override
@@ -417,12 +415,11 @@ public class GLPort implements GLEventListener {
         });
         final long elapsedMicroseconds = TimeUnit.MICROSECONDS.convert(System.nanoTime() - start, TimeUnit.NANOSECONDS);
         System.out.println("=== " + elapsedMicroseconds + " - " + DefaultFiberPool.getInstance().getQueuedSubmissionCount() + " " + DefaultFiberPool.getInstance().getQueuedTaskCount());
-        
+
         final int count = indexGen.get();
 
-        // clear arrays
-        for (int i = count; i < lastCount; i++)
-            Records.clear(ships[i]);
+        if (lastCount > count)
+            Records.clear(ships.slice(count, lastCount));
 
         return count;
     }
