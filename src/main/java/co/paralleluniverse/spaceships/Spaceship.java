@@ -244,8 +244,9 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
 //                phaser.arrive();
             }
         } catch (Throwable e) {
+            System.err.println("Exception in spaceship: " + this);
             e.printStackTrace();
-            Debug.exit(1);
+            //Debug.exit(1);
             return null;
         } finally {
             record(1, "Spaceship", "doRun", "%s: XXXXXX", this);
@@ -465,7 +466,7 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
             exVy += HIT_RECOIL_VELOCITY * udy;
             this.exVelocityUpdated = timeHit;
         } else if (status == Status.ALIVE) {
-            System.out.println("BOOM: " + this);
+            // System.out.println("BOOM: " + this);
             record(1, "Spaceship", "shot", "%s: BOOM", this);
             // I'm dead: blow up. The explosion pushes away all nearby ships.
             try (ResultSet<Record<SpaceshipState>> rs = global.sb.query(SpatialQueries.range(getAABB(), BLAST_RANGE))) {
