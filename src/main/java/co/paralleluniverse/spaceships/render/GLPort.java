@@ -83,24 +83,10 @@ public class GLPort implements GLEventListener {
     public static final int SHOOT_DURATION = 100;
     public static final float EXPLOSION_DURATION = 1000f;
     public static final int MAX_EXTRAPOLATION_DURATION = 1000;
-    public static final int SB_QUERY_RATE = 250;
+    public static final int SB_QUERY_RATE = 100;
     public static final int WIDTH_MARGINS = 800;
     public static final int MAX_PORT_WIDTH = 400;
     public static final String WINDOW_TITLE = "Spaceships";
-    //
-    private static final int ITEM_SIZE = 12;
-    private static final int LAST_MOVED = 0;
-    private static final int LX = 1;
-    private static final int LY = 2;
-    private static final int VX = 3;
-    private static final int VY = 4;
-    private static final int EVX = 5;
-    private static final int EVY = 6;
-    private static final int AX = 7;
-    private static final int AY = 8;
-    private static final int SHOT_TIME = 9;
-    private static final int BLOW_TIME = 10;
-    private static final int SHOT_LENGTH = 11;
     //
     private Texture spaceshipTex;
     private Texture explosionTex;
@@ -336,12 +322,13 @@ public class GLPort implements GLEventListener {
             double margins = WIDTH_MARGINS;
 
             final int n;
-//        if (now - lastQueryTime > SB_QUERY_RATE) {
-            n = query(now, SpatialQueries.contained(AABB.create(currentPort.min(X) - margins, currentPort.max(X) + margins, currentPort.min(Y) - margins, currentPort.max(Y) + margins)));
-            lastQueryTime = now;
-//        } else
-//            n = extrapolate(now);
-            lastDispTime = now;
+            if (now - lastQueryTime > SB_QUERY_RATE) {
+                n = query(now, SpatialQueries.contained(AABB.create(currentPort.min(X) - margins, currentPort.max(X) + margins, currentPort.min(Y) - margins, currentPort.max(Y) + margins)));
+                lastQueryTime = now;
+            } else {
+                n = indexGen.get();
+                lastDispTime = now;
+            }
 
             int countInPort = 0;
             for (Record<SpaceshipState> s : ships.slice(0, n)) {
@@ -414,7 +401,7 @@ public class GLPort implements GLEventListener {
             }
         });
         final long elapsedMicroseconds = TimeUnit.MICROSECONDS.convert(System.nanoTime() - start, TimeUnit.NANOSECONDS);
-        System.out.println("=== " + elapsedMicroseconds + " - " + DefaultFiberPool.getInstance().getQueuedSubmissionCount() + " " + DefaultFiberPool.getInstance().getQueuedTaskCount());
+        // System.out.println("=== " + elapsedMicroseconds + " - " + DefaultFiberPool.getInstance().getQueuedSubmissionCount() + " " + DefaultFiberPool.getInstance().getQueuedTaskCount());
 
         final int count = indexGen.get();
 

@@ -31,18 +31,18 @@ import java.util.concurrent.ThreadLocalRandom;
  */
 public class RandSpatial {
 
-    private final Random random;
-
-    public RandSpatial(long seed) {
-        random = new Random(seed);
-    }
-
-    public RandSpatial() {
-        random = ThreadLocalRandom.current();
-    }
+//    private final Random random;
+//
+//    public RandSpatial(long seed) {
+//        random = new Random(seed);
+//    }
+//
+//    public RandSpatial() {
+//        random = ThreadLocalRandom.current();
+//    }
 
     public Random getRandom() {
-        return random;
+        return ThreadLocalRandom.current();
     }
 
     private MutableAABB floatify(MutableAABB aabb) {
@@ -68,7 +68,7 @@ public class RandSpatial {
     public AABB randomAABB(AABB bounds, double expSize, double variance) {
         MutableAABB aabb = AABB.create(bounds.dims());
         for (int i = 0; i < bounds.dims(); i++) {
-            double tmp = random.nextGaussian();
+            double tmp = getRandom().nextGaussian();
             double size = (tmp*tmp) * variance + expSize;
             if(expSize > 0 && size == 0)
                 size = 0.01;
@@ -85,43 +85,43 @@ public class RandSpatial {
     }
 
     public double randRange(double min, double max) {
-        double r = random.nextDouble();
+        double r = getRandom().nextDouble();
         return (float)(r * (max - min) + min);
     }
 
     public synchronized void setSeed(long seed) {
-        random.setSeed(seed);
+        getRandom().setSeed(seed);
     }
 
     public long nextLong() {
-        return random.nextLong();
+        return getRandom().nextLong();
     }
 
     public int nextInt(int n) {
-        return random.nextInt(n);
+        return getRandom().nextInt(n);
     }
 
     public int nextInt() {
-        return random.nextInt();
+        return getRandom().nextInt();
     }
 
     public synchronized double nextGaussian() {
-        return random.nextGaussian();
+        return getRandom().nextGaussian();
     }
 
     public float nextFloat() {
-        return random.nextFloat();
+        return getRandom().nextFloat();
     }
 
     public double nextDouble() {
-        return random.nextDouble();
+        return getRandom().nextDouble();
     }
 
     public void nextBytes(byte[] bytes) {
-        random.nextBytes(bytes);
+        getRandom().nextBytes(bytes);
     }
 
     public boolean nextBoolean() {
-        return random.nextBoolean();
+        return getRandom().nextBoolean();
     }
 }

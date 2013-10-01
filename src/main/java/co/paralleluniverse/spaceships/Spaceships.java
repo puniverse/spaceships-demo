@@ -19,15 +19,13 @@
  */
 package co.paralleluniverse.spaceships;
 
-import co.paralleluniverse.actors.ActorRef;
 import co.paralleluniverse.actors.ActorSpec;
-import co.paralleluniverse.actors.ActorUtil;
 import co.paralleluniverse.actors.LocalActorUtil;
 import co.paralleluniverse.actors.behaviors.Supervisor;
 import co.paralleluniverse.actors.behaviors.SupervisorActor;
 import co.paralleluniverse.common.monitoring.Metrics;
+import co.paralleluniverse.common.monitoring.MonitorType;
 import co.paralleluniverse.data.record.Record;
-import co.paralleluniverse.common.util.Debug;
 import co.paralleluniverse.fibers.*;
 import co.paralleluniverse.spacebase.AABB;
 import co.paralleluniverse.spacebase.quasar.SpaceBase;
@@ -41,6 +39,7 @@ import java.io.PrintStream;
 import java.util.Properties;
 import java.util.concurrent.Phaser;
 import java.util.concurrent.TimeUnit;
+import jsr166e.LongAdder;
 
 public class Spaceships {
     public static Spaceships spaceships;
@@ -83,11 +82,12 @@ public class Spaceships {
     private File metricsDir;
     private PrintStream configStream;
     private PrintStream timeStream;
+    final LongAdder spaceshipsCycles = new LongAdder();
     //
     private long cycleStart;
 
     public Spaceships(Properties props) throws Exception {
-        final int parallelism = Integer.parseInt(props.getProperty("parallelism", "2"));
+        final int parallelism = DefaultFiberScheduler.getInstance().getFjPool().getParallelism();// Integer.parseInt(props.getProperty("parallelism", "2"));
         this.async = Boolean.parseBoolean(props.getProperty("async", "true"));
         double b = Double.parseDouble(props.getProperty("world-length", "20000"));
         this.bounds = AABB.create(-b / 2, b / 2, -b / 2 * 0.7, b / 2 * 0.7, -b / 2, b / 2);
@@ -164,7 +164,7 @@ public class Spaceships {
         builder.setSinglePrecision(singlePrecision).setCompressed(compressed);
         builder.setNodeWidth(nodeWidth);
 
-        builder.setMonitoringType(SpaceBaseBuilder.MonitorType.JMX);
+        builder.setMonitoringType(MonitorType.JMX);
         if (metricsDir != null) {
             com.codahale.metrics.CsvReporter.forRegistry(Metrics.registry())
                     .convertRatesTo(TimeUnit.SECONDS)
@@ -194,12 +194,26 @@ public class Spaceships {
         Thread.sleep(3000);
         port = new GLPort(toolkit, N + 20, Spaceships.this, bounds);
 
-        LocalActorUtil.join(sup);
-        System.exit(1);
+//        LocalActorUtil.join(sup);
+//        System.exit(1);
         
-//        if (timeStream != null)
-//            timeStream.println("# time, millis, millis1, millis0");
-//
+        if (timeStream != null)
+            timeStream.println("# time, millis, millis1, millis0");
+
+        long prevTime = System.nanoTime();
+        for(int k=0;; k++) {
+            Thread.sleep(1000);
+            long cycles = spaceshipsCycles.sumThenReset();
+            long now = System.nanoTime();
+            
+            double seconds = (double)(now - prevTime) * 1e-9;
+            double frames = (double)cycles / (double)N;
+            
+            double fps = frames / seconds;
+            System.out.println("RATE: " + fps + " fps");
+            
+            prevTime = now;
+        }
 //        for (int k = 0;; k++) {
 //            cycleStart = System.nanoTime();
 //
@@ -216,9 +230,6 @@ public class Spaceships {
 //
 //            System.out.println("CYCLE: " + millis + " millis ");
 //        }
-
-//        for (ActorRef<Spaceship.SpaceshipMessage> s : ships)
-//            LocalActorUtil.join(s);
     }
 
     public long now() {
