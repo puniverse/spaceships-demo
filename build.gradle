@@ -30,21 +30,18 @@ configurations {
 }
     
 dependencies {
-    compile ":spacebase"
-    compile ":jsr166e"
+    compile "co.paralleluniverse:spacebase-core:2.0-SNAPSHOT"
     compile "co.paralleluniverse:quasar-core:0.3.0-SNAPSHOT"
     compile "co.paralleluniverse:quasar-actors:0.3.0-SNAPSHOT"
     compile "com.codahale.metrics:metrics-core:3.0.0" 
     compile ":jogl-all",":gluegen-rt"
-    runtime ":padlock:2.2"
-    runtime ":commons-codec:1.3" 
     runtime "com.google.guava:guava:14.0.1"
     runtime "net.sf.trove4j:trove4j:3.0.2"        
     // Download natives from https://jogamp.org/deployment/autobuilds/master/jogl-b899-2013-01-19_20-17-11/
     // Download natives from https://jogamp.org/deployment/autobuilds/master/gluegen-b625-2013-01-19_07-06-09/
     runtime ":jogl-all-natives-linux-i586",":jogl-all-natives-macosx-universal",":jogl-all-natives-windows-i586",":jogl-all-natives-linux-amd64",":jogl-all-natives-windows-amd64"
     runtime ":gluegen-rt-natives-linux-i586",":gluegen-rt-natives-macosx-universal",":gluegen-rt-natives-windows-i586",":gluegen-rt-natives-linux-amd64",":gluegen-rt-natives-windows-amd64"
-    quasar  "co.paralleluniverse:quasar-core:0.2.0"
+    quasar  "co.paralleluniverse:quasar-core:0.3.0-SNAPSHOT"
 }
 
 task copyShaders(type:Copy) {
@@ -59,19 +56,21 @@ task wrapper(type: Wrapper) {
 
 tasks.withType(JavaExec) {
 //    systemProperty "co.paralleluniverse.debugMode", "true"
-//    jvmArgs '-verbose:gc'
-    jvmArgs '-ea'
+    jvmArgs '-server'
+    jvmArgs '-verbose:gc'
+    //    jvmArgs '-XX:+PrintCompilation'
+    //    jvmArgs '-XX:+UseG1GC', '-XX:MaxGCPauseMillis=50'
+    //    jvmArgs '-ea'
     jvmArgs '-Xmx1024m'
-    jvmArgs "-javaagent:${configurations.quasar.iterator().next()}" // =v, =d
-    jvmArgs '-XX:+UnlockCommercialFeatures'
-    jvmArgs '-XX:+FlightRecorder'
+    jvmArgs "-javaagent:${configurations.quasar.iterator().next()}" // =vdmc (verbose, debug, allow monitors, check class)
+    jvmArgs '-XX:+UnlockCommercialFeatures', '-XX:+FlightRecorder'
     systemProperty "co.paralleluniverse.fibers.DefaultFiberPool.parallelism", "8"
     systemProperty "co.paralleluniverse.fibers.DefaultFiberPool.monitor", "JMX" // "METRICS" // "NONE" //
     systemProperty "log4j.configurationFile", "${rootProject.projectDir}/log4j.xml"
     systemProperty "Log4jContextSelector", "org.apache.logging.log4j.core.async.AsyncLoggerContextSelector"
     systemProperty "co.paralleluniverse.globalFlightRecorder", "true"
     systemProperty "co.paralleluniverse.flightRecorderDumpFile", "spaceships.log"
-    systemProperty "co.paralleluniverse.monitoring.flightRecorderSize","200000" 
+    systemProperty "co.paralleluniverse.monitoring.flightRecorderSize","100000" 
 }
 
 defaultTasks 'build','run'
