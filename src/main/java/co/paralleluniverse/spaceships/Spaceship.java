@@ -29,11 +29,11 @@ import co.paralleluniverse.fibers.*;
 import co.paralleluniverse.spacebase.AABB;
 import static co.paralleluniverse.spacebase.AABB.X;
 import static co.paralleluniverse.spacebase.AABB.Y;
-import co.paralleluniverse.spacebase.ElementAndBounds;
 import co.paralleluniverse.spacebase.ElementUpdater;
 import co.paralleluniverse.spacebase.MutableAABB;
 import co.paralleluniverse.spacebase.SpatialQueries;
 import co.paralleluniverse.spacebase.SpatialToken;
+import co.paralleluniverse.spacebase.quasar.Element;
 import co.paralleluniverse.spacebase.quasar.ElementUpdater1;
 import co.paralleluniverse.spacebase.quasar.ResultSet;
 import static co.paralleluniverse.spaceships.SpaceshipState.*;
@@ -146,9 +146,12 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
         try {
             record(1, "Spaceship", "doRun", "%s", this);
             for (int i = 0;; i++) {
-                final long nextMove = state.lastMoved + MIN_PERIOD_MILLIS;
-                SpaceshipMessage message = receive(nextMove - now(), TimeUnit.MILLISECONDS);
+                final long nextCycle = status == Status.ALIVE
+                        ? Math.min(state.lastMoved + MIN_PERIOD_MILLIS, nextActionTime())
+                        : nextActionTime();
+                SpaceshipMessage message = receive(nextCycle - now(), TimeUnit.MILLISECONDS);
                 final long now = now();
+
                 if (message != null) {
                     // handle message
                     if (message instanceof Shot)
@@ -161,27 +164,17 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
 
                     if (status == Status.GONE) {
                         record(1, "Spaceship", "doRun", "%s: gone", this);
-                        return null; // explosion has finished
+                        return null;
                     } else if (status == Status.ALIVE) {
-                        if (lockedOn == null) {
-                            if (now - timeHit > SHOOT_INABILITY_DURATION && random.nextFloat() < SEARCH_PROBABLITY)
+                        if (!isLockedOnTarget()) {
+                            if (canFight(now) && wantToFight(now))
                                 searchForTargets();
                         } else
                             chaseAndShoot();
                         applyNeighborRejectionAndMove(now);
-                    } else if (status == Status.BLOWING_UP && state.status != status) {
-                        try (ElementUpdater1<Record<SpaceshipState>> up = global.sb.update(state.token)) {
-                            state.status = status;
-                            state.vx = 0.0;
-                            state.vy = 0.0;
-                            state.exVx = 0.0;
-                            state.exVy = 0.0;
-                            state.ax = 0.0;
-                            state.ay = 0.0;
-                        }
                     }
+
                     global.spaceshipsCycles.increment();
-                    state.lastMoved = now();
                 }
                 if (isRecordingLevel(1))
                     record(1, "Spaceship", "doRun", "%s: iter %s", this, i);
@@ -190,13 +183,20 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
         } catch (Throwable e) {
             System.err.println("Exception in spaceship: " + this);
             e.printStackTrace();
-            //Debug.exit(1);
             return null;
         } finally {
             record(1, "Spaceship", "doRun", "%s: DONE", this);
 //            phaser.arriveAndDeregister();
             global.sb.delete(state.token);
         }
+    }
+
+    private boolean canFight(long now) {
+        return now - timeHit > SHOOT_INABILITY_DURATION;
+    }
+
+    private boolean wantToFight(long now) {
+        return random.nextFloat() < SEARCH_PROBABLITY;
     }
 
     private void searchForTargets() throws SuspendExecution, InterruptedException {
@@ -212,7 +212,7 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
                 final double dx = s.get($x) - state.x;
                 final double dy = s.get($y) - state.y;
 
-                double rng2 = dx * dx + dy * dy;
+                final double rng2 = dx * dx + dy * dy;
                 if (rng2 > 100 & rng2 <= minRange2) { //not me and not so close
                     minRange2 = rng2;
                     nearestShip = s;
@@ -228,25 +228,26 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
         record(1, "Spaceship", "chaseAndShoot", "%s: locked", this);
         // check lock range, chase, shoot
         boolean foundLockedOn = false;
-        ElementAndBounds<Record<SpaceshipState>> target = global.sb.getElement(lockedOn);
-        if (target != null) {
-            foundLockedOn = true;
-            final Record<SpaceshipState> lockedSpaceship = target.getElement();
+        try (Element<Record<SpaceshipState>> target = global.sb.readElement(lockedOn)) {
+            final Record<SpaceshipState> lockedSpaceship;
+            if (target != null && (lockedSpaceship = target.get()) != null) {
+                foundLockedOn = true;
 
-            // double angularDiversion = abs(atan2(lockedSpaceship.vx, lockedSpaceship.vy) - getCurrentHeading(shootTime));
-            if (inShotRange(target.getBounds()) & global.random.nextGaussian() < SHOOT_PROBABLITY) {
-                record(1, "Spaceship", "chaseAndShoot", "%s: shootrange", this);
-                double range = mag(lockedSpaceship.get($x) - state.x, lockedSpaceship.get($y) - state.y);
-                shoot(range);
-                lockedSpaceship.get($spaceship).send(new Shot(state.x, state.y));
-            }
-            if (inLockRange(target.getBounds())) {
-                record(1, "Spaceship", "chaseAndShoot", "%s: lockrange", this);
-//              shoot(global, range);
-                chase(target.getElement());
-            } else {
-                record(1, "Spaceship", "chaseAndShoot", "%s: release lock", this);
-                lockOnTarget(null);  // not in range, release lock
+                final AABB aabb = getAABB(lockedSpaceship);
+                // double angularDiversion = abs(atan2(lockedSpaceship.vx, lockedSpaceship.vy) - getCurrentHeading(shootTime));
+                if (inShotRange(aabb) & global.random.nextGaussian() < SHOOT_PROBABLITY) {
+                    record(1, "Spaceship", "chaseAndShoot", "%s: shootrange", this);
+                    final double range = mag(lockedSpaceship.get($x) - state.x, lockedSpaceship.get($y) - state.y);
+                    shoot(range);
+                    lockedSpaceship.get($spaceship).send(new Shot(state.x, state.y));
+                }
+                if (inLockRange(aabb)) {
+                    record(1, "Spaceship", "chaseAndShoot", "%s: lockrange", this);
+                    chase(lockedSpaceship);
+                } else {
+                    record(1, "Spaceship", "chaseAndShoot", "%s: release lock", this);
+                    lockOnTarget(null);  // not in range, release lock
+                }
             }
         }
         if (!foundLockedOn)
@@ -289,7 +290,8 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
             applyNeighborRejection(rs.getResultReadOnly(), now);
 
             assert rs.getResultForUpdate().size() <= 1;
-            for (final ElementUpdater<Record<SpaceshipState>> updater : rs.getResultForUpdate()) {
+            for (ElementUpdater<Record<SpaceshipState>> updater : rs.getResultForUpdate()) {
+                // this is me
                 assert updater.elem().equals(stateRecord);
 
                 move(now);
@@ -399,15 +401,6 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
         state.lastMoved = now;
     }
 
-    private void reduceExternalVelocity(long currentTime) {
-        double duration = (double) (currentTime - exVelocityUpdated) / TimeUnit.SECONDS.toMillis(1);
-        if (exVelocityUpdated > 0 & duration > 0) {
-            exVx /= (1 + 8 * duration);
-            exVy /= (1 + 8 * duration);
-        }
-        exVelocityUpdated = currentTime;
-    }
-
     /**
      * I've been shot!
      *
@@ -441,13 +434,28 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
                     s.get($spaceship).send(blastMessage);
             }
             this.status = Status.BLOWING_UP;
-            state.blowTime = timeHit;
+
+            try (ElementUpdater1<Record<SpaceshipState>> up = global.sb.update(state.token)) {
+                state.status = Status.BLOWING_UP;
+                state.vx = 0.0;
+                state.vy = 0.0;
+                state.exVx = 0.0;
+                state.exVy = 0.0;
+                state.ax = 0.0;
+                state.ay = 0.0;
+                state.blowTime = timeHit;
+            }
+
             delay(timeHit, BLOW_TILL_DELETE_DURATION, TimeUnit.MILLISECONDS, new Runnable() {
                 public void run() {
                     status = Status.GONE;
                 }
             });
         }
+    }
+
+    private boolean isLockedOnTarget() {
+        return lockedOn != null;
     }
 
     private void lockOnTarget(Record<SpaceshipState> target) {
@@ -462,17 +470,6 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
     private void shoot(double range) {
         timeFired = global.now();
         shotLength = range;
-    }
-
-    private void runDelayed(long now) {
-        for (;;) {
-            DelayedRunnable command = delayQueue.peek();
-            if (command != null && command.time <= now) {
-                delayQueue.poll();
-                command.run();
-            } else
-                break;
-        }
     }
 
     /**
@@ -512,6 +509,15 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
         }
     }
 
+    private void reduceExternalVelocity(long currentTime) {
+        double duration = (double) (currentTime - exVelocityUpdated) / TimeUnit.SECONDS.toMillis(1);
+        if (exVelocityUpdated > 0 & duration > 0) {
+            exVx /= (1 + 8 * duration);
+            exVy /= (1 + 8 * duration);
+        }
+        exVelocityUpdated = currentTime;
+    }
+
     private AABB getAABB() {
         final MutableAABB aabb = AABB.create(2);
         getAABB(aabb);
@@ -522,6 +528,22 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
         // capture x and y atomically (each)
         final double _x = state.x;
         final double _y = state.y;
+        aabb.min(X, _x);
+        aabb.max(X, _x);
+        aabb.min(Y, _y);
+        aabb.max(Y, _y);
+    }
+
+    private static AABB getAABB(Record<SpaceshipState> state) {
+        final MutableAABB aabb = AABB.create(2);
+        getAABB(state, aabb);
+        return aabb;
+    }
+
+    private static void getAABB(Record<SpaceshipState> state, MutableAABB aabb) {
+        // capture x and y atomically (each)
+        final double _x = state.get($x);
+        final double _y = state.get($y);
         aabb.min(X, _x);
         aabb.max(X, _x);
         aabb.min(Y, _y);
@@ -543,6 +565,22 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
                 command.run();
             }
         });
+    }
+
+    private void runDelayed(long now) {
+        for (;;) {
+            DelayedRunnable command = delayQueue.peek();
+            if (command != null && command.time <= now) {
+                delayQueue.poll();
+                command.run();
+            } else
+                break;
+        }
+    }
+
+    private long nextActionTime() {
+        DelayedRunnable command = delayQueue.peek();
+        return command != null ? command.time : Long.MAX_VALUE;
     }
 
     public static void getCurrentLocation(Record<SpaceshipState> s, long currentTime, FloatBuffer buffer) {

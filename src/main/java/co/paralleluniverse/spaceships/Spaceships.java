@@ -20,7 +20,6 @@
 package co.paralleluniverse.spaceships;
 
 import co.paralleluniverse.actors.ActorSpec;
-import co.paralleluniverse.actors.LocalActorUtil;
 import co.paralleluniverse.actors.behaviors.Supervisor;
 import co.paralleluniverse.actors.behaviors.SupervisorActor;
 import co.paralleluniverse.common.monitoring.Metrics;
@@ -106,6 +105,8 @@ public class Spaceships {
         this.random = new RandSpatial();
 
         this.sb = initSpaceBase(props);
+        // sb.setDefaultTimeoutMillis(1000);
+        
         this.toolkit = GLPort.Toolkit.valueOf(props.getProperty("ui-component", "NEWT").toUpperCase());
 
         println("UI Component: " + toolkit);
