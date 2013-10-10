@@ -192,7 +192,7 @@ public class Spaceships {
             }
         }.spawn();
 
-        Thread.sleep(3000);
+        Thread.sleep(5000); // wait for things to optimize a bit.
         port = new GLPort(toolkit, N + 20, Spaceships.this, bounds);
 
 //        LocalActorUtil.join(sup);
@@ -211,7 +211,7 @@ public class Spaceships {
             double frames = (double)cycles / (double)N;
             
             double fps = frames / seconds;
-            System.out.println("RATE: " + fps + " fps");
+            System.out.println(k + "\tRATE: " + fps + " fps");
             
             prevTime = now;
         }
