@@ -36,6 +36,7 @@ public final class SpaceshipState {
     public static final LongField<SpaceshipState> $lastMoved = stateType.longField("lastMoved");
     public static final LongField<SpaceshipState> $timeFired = stateType.longField("timeFired");
     public static final LongField<SpaceshipState> $blowTime = stateType.longField("blowTime");
+    public static final LongField<SpaceshipState> $exVelocityUpdated = stateType.longField("exVelocityUpdated");
     public static final DoubleField<SpaceshipState> $shotLength = stateType.doubleField("shotLength");
     public static final DoubleField<SpaceshipState> $x = stateType.doubleField("x");
     public static final DoubleField<SpaceshipState> $y = stateType.doubleField("y");

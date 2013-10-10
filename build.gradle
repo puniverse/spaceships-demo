@@ -61,7 +61,7 @@ tasks.withType(JavaExec) {
     
     // debugging
     // jvmArgs '-ea'
-//    systemProperty "co.paralleluniverse.debugMode", "true"
+    // systemProperty "co.paralleluniverse.debugMode", "true"
     systemProperty "co.paralleluniverse.globalFlightRecorder", "true"
     systemProperty "co.paralleluniverse.flightRecorderDumpFile", "spaceships.log"
     systemProperty "co.paralleluniverse.monitoring.flightRecorderSize","100000" 

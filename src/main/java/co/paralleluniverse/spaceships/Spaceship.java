@@ -97,6 +97,7 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
         SpatialToken token;
         Status status = Status.ALIVE;
         long lastMoved = -1L;
+        long exVelocityUpdated;
         double x;
         double y;
         double vx;
@@ -155,9 +156,9 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
                 if (message != null) {
                     // handle message
                     if (message instanceof Shot)
-                        shot(((Shot) message).x, ((Shot) message).y);
+                        shot(now, ((Shot) message).x, ((Shot) message).y);
                     else if (message instanceof Blast)
-                        blast(((Blast) message).x, ((Blast) message).y);
+                        blast(now, ((Blast) message).x, ((Blast) message).y);
                 } else {
                     // no message
                     runDelayed(now); // apply delayed actions
@@ -298,6 +299,7 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
                 state.status = status;
                 state.timeFired = timeFired;
                 state.shotLength = shotLength;
+                state.exVelocityUpdated = exVelocityUpdated;
                 updater.update(getAABB());
             }
         }
@@ -407,10 +409,10 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
      * @param global
      * @param shooter
      */
-    private void shot(double shooterX, double shooterY) throws SuspendExecution, InterruptedException {
+    private void shot(long now, double shooterX, double shooterY) throws SuspendExecution, InterruptedException {
         record(1, "Spaceship", "shot", "%s: shot", this);
         this.timesHit++;
-        timeHit = global.now();
+        timeHit = now;
         if (timesHit < TIMES_HIT_TO_BLOW) {
             final double dx = shooterX - state.x;
             final double dy = shooterY - state.y;
@@ -420,10 +422,10 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
             final double udx = dx / d;
             final double udy = dy / d;
 
-            reduceExternalVelocity(timeHit);
+            reduceExternalVelocity(now);
             exVx += HIT_RECOIL_VELOCITY * udx;
             exVy += HIT_RECOIL_VELOCITY * udy;
-            this.exVelocityUpdated = timeHit;
+            this.exVelocityUpdated = now;
         } else if (status == Status.ALIVE) {
             // System.out.println("BOOM: " + this);
             record(1, "Spaceship", "shot", "%s: BOOM", this);
@@ -443,10 +445,10 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
                 state.exVy = 0.0;
                 state.ax = 0.0;
                 state.ay = 0.0;
-                state.blowTime = timeHit;
+                state.blowTime = now;
             }
 
-            delay(timeHit, BLOW_TILL_DELETE_DURATION, TimeUnit.MILLISECONDS, new Runnable() {
+            delay(now, BLOW_TILL_DELETE_DURATION, TimeUnit.MILLISECONDS, new Runnable() {
                 public void run() {
                     status = Status.GONE;
                 }
@@ -475,7 +477,7 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
     /**
      * A nearby ship has exploded, accelerate away in the blast.
      */
-    private void blast(double explosionX, double explosionY) {
+    private void blast(long now, double explosionX, double explosionY) {
         final double dx = explosionX - state.x;
         final double dy = explosionY - state.y;
         final double d = mag(dx, dy);
@@ -486,10 +488,10 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
 
         double hitRecoil = 0.25 * d - 200;
 
-        reduceExternalVelocity(global.now());
+        reduceExternalVelocity(now);
         exVx += hitRecoil * udx;
         exVy += hitRecoil * udy;
-        this.exVelocityUpdated = global.now();
+        this.exVelocityUpdated = now;
     }
 
     private void setVelocityDir(double direction, double speed) {
@@ -584,15 +586,24 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
     }
 
     public static void getCurrentLocation(Record<SpaceshipState> s, long currentTime, FloatBuffer buffer) {
-        final double duration = (double) (currentTime - s.get($lastMoved)) / TimeUnit.SECONDS.toMillis(1);
+        final double dt = (double) (currentTime - s.get($lastMoved)) / TimeUnit.SECONDS.toMillis(1);
 
         double currentX = s.get($x);
         double currentY = s.get($y);
-        if (duration < 0.25) { // don't extrapolate over 1/4 second
-            final double duration2 = duration * duration;
 
-            currentX = currentX + (s.get($vx) + s.get($exVx)) * duration + s.get($ax) * duration2;
-            currentY = currentY + (s.get($vy) + s.get($exVx)) * duration + s.get($ay) * duration2;
+        if (dt < 0.5) { // don't extrapolate over 0.5 second
+            double exVx = s.get($exVx);
+            double exVy = s.get($exVx);
+            final double dext = (double) (currentTime - s.get($exVelocityUpdated)) / TimeUnit.SECONDS.toMillis(1);
+            if (s.get($exVelocityUpdated) > 0 & dext > 0) {
+                exVx /= (1 + 8 * dext);
+                exVy /= (1 + 8 * dext);
+            }
+
+            final double dt2 = dt * dt;
+
+            currentX = currentX + (s.get($vx) + exVx) * dt + s.get($ax) * dt2;
+            currentY = currentY + (s.get($vy) + exVy) * dt + s.get($ay) * dt2;
         }
 
         buffer.put((float) currentX);
@@ -600,14 +611,14 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
     }
 
     public static double getCurrentHeading(Record<SpaceshipState> s, long currentTime) {
-        final double duration = (double) (currentTime - s.get($lastMoved)) / TimeUnit.SECONDS.toMillis(1);
+        final double dt = (double) (currentTime - s.get($lastMoved)) / TimeUnit.SECONDS.toMillis(1);
 
         double currentVx = s.get($vx);
         double currentVy = s.get($vy);
 
-        if (duration < 0.25) { // don't extrapolate over 1/4 second
-            currentVx = currentVx + s.get($ax) * duration;
-            currentVy = currentVy + s.get($ay) * duration;
+        if (dt < 0.5) { // don't extrapolate over 0.5 second
+            currentVx = currentVx + s.get($ax) * dt;
+            currentVy = currentVy + s.get($ay) * dt;
         }
         return atan2(currentVx, currentVy);
     }
