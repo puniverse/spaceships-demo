@@ -38,12 +38,12 @@ import co.paralleluniverse.spacebase.quasar.ElementUpdater1;
 import co.paralleluniverse.spacebase.quasar.ResultSet;
 import static co.paralleluniverse.spaceships.SpaceshipState.*;
 import co.paralleluniverse.strands.channels.Channels;
+import co.paralleluniverse.strands.concurrent.Phaser;
 import static java.lang.Math.*;
 import java.nio.FloatBuffer;
 import java.util.PriorityQueue;
 import java.util.Queue;
 import java.util.Set;
-import java.util.concurrent.Phaser;
 import java.util.concurrent.TimeUnit;
 
 /**
@@ -140,10 +140,12 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
 
     @Override
     protected Void doRun() throws InterruptedException, SuspendExecution {
-//        phaser.register();
+        if (phaser != null)
+            phaser.register();
         state.spaceship = ref();
         state.token = global.sb.insert(new TransactionalRecord<>(this, stateRecord), getAABB());
 
+        boolean deregistered = false;
         try {
             record(1, "Spaceship", "doRun", "%s", this);
             for (int i = 0;; i++) {
@@ -155,9 +157,13 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
 
                 if (message != null) {
                     // handle message
-                    if (message instanceof Shot)
-                        shot(now, ((Shot) message).x, ((Shot) message).y);
-                    else if (message instanceof Blast)
+                    if (message instanceof Shot) {
+                        boolean killed = shot(now, ((Shot) message).x, ((Shot) message).y);
+                        if(killed && phaser != null) {
+                            deregistered = true;
+                            phaser.arriveAndDeregister();
+                        }
+                    } else if (message instanceof Blast)
                         blast(now, ((Blast) message).x, ((Blast) message).y);
                 } else {
                     // no message
@@ -176,10 +182,12 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
                     }
 
                     global.spaceshipsCycles.increment();
+
+                    if (phaser != null)
+                        phaser.arriveAndAwaitAdvance();
                 }
                 if (isRecordingLevel(1))
                     record(1, "Spaceship", "doRun", "%s: iter %s", this, i);
-//                phaser.arrive();
             }
         } catch (Throwable e) {
             System.err.println("Exception in spaceship: " + this);
@@ -187,7 +195,8 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
             return null;
         } finally {
             record(1, "Spaceship", "doRun", "%s: DONE", this);
-//            phaser.arriveAndDeregister();
+            if (phaser != null && !deregistered)
+                phaser.arriveAndDeregister();
             global.sb.delete(state.token);
         }
     }
@@ -409,7 +418,7 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
      * @param global
      * @param shooter
      */
-    private void shot(long now, double shooterX, double shooterY) throws SuspendExecution, InterruptedException {
+    private boolean shot(long now, double shooterX, double shooterY) throws SuspendExecution, InterruptedException {
         record(1, "Spaceship", "shot", "%s: shot", this);
         this.timesHit++;
         timeHit = now;
@@ -426,6 +435,7 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
             exVx += HIT_RECOIL_VELOCITY * udx;
             exVy += HIT_RECOIL_VELOCITY * udy;
             this.exVelocityUpdated = now;
+            return false;
         } else if (status == Status.ALIVE) {
             // System.out.println("BOOM: " + this);
             record(1, "Spaceship", "shot", "%s: BOOM", this);
@@ -453,7 +463,9 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
                     status = Status.GONE;
                 }
             });
+            return true;
         }
+        return false;
     }
 
     private boolean isLockedOnTarget() {
@@ -586,40 +598,41 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
     }
 
     public static void getCurrentLocation(Record<SpaceshipState> s, long currentTime, FloatBuffer buffer) {
-        final double dt = (double) (currentTime - s.get($lastMoved)) / TimeUnit.SECONDS.toMillis(1);
-
+        double dt = (double) (currentTime - s.get($lastMoved)) / TimeUnit.SECONDS.toMillis(1);
+        double dext = (double) (currentTime - s.get($exVelocityUpdated)) / TimeUnit.SECONDS.toMillis(1);
+        dt = Math.min(dt, 0.5);     // don't extrapolate over 0.5 second
+        dext = Math.min(dext, 0.5); // don't extrapolate over 0.5 second
+        
         double currentX = s.get($x);
         double currentY = s.get($y);
 
-        if (dt < 0.5) { // don't extrapolate over 0.5 second
-            double exVx = s.get($exVx);
-            double exVy = s.get($exVx);
-            final double dext = (double) (currentTime - s.get($exVelocityUpdated)) / TimeUnit.SECONDS.toMillis(1);
-            if (s.get($exVelocityUpdated) > 0 & dext > 0) {
-                exVx /= (1 + 8 * dext);
-                exVy /= (1 + 8 * dext);
-            }
-
-            final double dt2 = dt * dt;
-
-            currentX = currentX + (s.get($vx) + exVx) * dt + s.get($ax) * dt2;
-            currentY = currentY + (s.get($vy) + exVy) * dt + s.get($ay) * dt2;
+        double exVx = s.get($exVx);
+        double exVy = s.get($exVx);
+        
+        if (s.get($exVelocityUpdated) > 0 & dext > 0) {
+            exVx /= (1 + 8 * dext);
+            exVy /= (1 + 8 * dext);
         }
+
+        final double dt2 = dt * dt;
+
+        currentX = currentX + (s.get($vx) + exVx) * dt + s.get($ax) * dt2;
+        currentY = currentY + (s.get($vy) + exVy) * dt + s.get($ay) * dt2;
 
         buffer.put((float) currentX);
         buffer.put((float) currentY);
     }
 
     public static double getCurrentHeading(Record<SpaceshipState> s, long currentTime) {
-        final double dt = (double) (currentTime - s.get($lastMoved)) / TimeUnit.SECONDS.toMillis(1);
+        double dt = (double) (currentTime - s.get($lastMoved)) / TimeUnit.SECONDS.toMillis(1);
+        dt = Math.min(dt, 0.5); // don't extrapolate over 0.5 second
 
         double currentVx = s.get($vx);
         double currentVy = s.get($vy);
 
-        if (dt < 0.5) { // don't extrapolate over 0.5 second
-            currentVx = currentVx + s.get($ax) * dt;
-            currentVy = currentVy + s.get($ay) * dt;
-        }
+        currentVx = currentVx + s.get($ax) * dt;
+        currentVy = currentVy + s.get($ay) * dt;
+
         return atan2(currentVx, currentVy);
     }
 

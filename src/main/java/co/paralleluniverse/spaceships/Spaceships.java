@@ -30,13 +30,13 @@ import co.paralleluniverse.spacebase.AABB;
 import co.paralleluniverse.spacebase.quasar.SpaceBase;
 import co.paralleluniverse.spacebase.quasar.SpaceBaseBuilder;
 import co.paralleluniverse.spaceships.render.GLPort;
+import co.paralleluniverse.strands.concurrent.Phaser;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.util.Properties;
-import java.util.concurrent.Phaser;
 import java.util.concurrent.TimeUnit;
 import jsr166e.LongAdder;
 
@@ -78,6 +78,7 @@ public class Spaceships {
     public final double speedVariance;
     public final boolean async;
     public final double range;
+    private final Phaser phaser;
     private File metricsDir;
     private PrintStream configStream;
     private PrintStream timeStream;
@@ -95,18 +96,22 @@ public class Spaceships {
         this.range = Double.parseDouble(props.getProperty("radar-range", "10"));
         this.extrapolate = Boolean.parseBoolean(props.getProperty("extrapolate", "true"));
 
+        this.phaser = Boolean.parseBoolean(props.getProperty("phaser", "false")) ? new Phaser() : null;
+        
         if (props.getProperty("dir") != null) // collect performance metrics in csv files
             createMetricsFiles(props);
 
         println("World bounds: " + bounds);
         println("N: " + N);
         println("Parallelism: " + parallelism);
-
+        println("Phaser: " + (phaser != null));
+        println();
+        
         this.random = new RandSpatial();
 
         this.sb = initSpaceBase(props);
         // sb.setDefaultTimeoutMillis(1000);
-        
+
         this.toolkit = GLPort.Toolkit.valueOf(props.getProperty("ui-component", "NEWT").toUpperCase());
 
         println("UI Component: " + toolkit);
@@ -143,6 +148,7 @@ public class Spaceships {
         final boolean singlePrecision = Boolean.parseBoolean(props.getProperty("single-precision", "false"));
         final int nodeWidth = Integer.parseInt(props.getProperty("node-width", "10"));
 
+        println("SpaceBase properties");
         println("Optimistic: " + optimistic);
         println("Optimistic height: " + optimisticHeight);
         println("Optimistic retry limit: " + optimisticRetryLimit);
@@ -182,8 +188,6 @@ public class Spaceships {
      * Main loop: loops over all spaceships and initiates each spaceship's actions. Simulates an IO thread receiving commands over the net.
      */
     private void run() throws Exception {
-        final Phaser phaser = new Phaser();
-
         final Supervisor sup = new SupervisorActor(SupervisorActor.RestartStrategy.ONE_FOR_ONE) {
             @Override
             protected void init() throws InterruptedException, SuspendExecution {
@@ -197,40 +201,44 @@ public class Spaceships {
 
 //        LocalActorUtil.join(sup);
 //        System.exit(1);
-        
+
         if (timeStream != null)
             timeStream.println("# time, millis, millis1, millis0");
 
-        long prevTime = System.nanoTime();
-        for(int k=0;; k++) {
-            Thread.sleep(1000);
-            long cycles = spaceshipsCycles.sumThenReset();
-            long now = System.nanoTime();
-            
-            double seconds = (double)(now - prevTime) * 1e-9;
-            double frames = (double)cycles / (double)N;
-            
-            double fps = frames / seconds;
-            System.out.println(k + "\tRATE: " + fps + " fps");
-            
-            prevTime = now;
+        if (true) {
+            long prevTime = System.nanoTime();
+            for (int k = 0;; k++) {
+                Thread.sleep(1000);
+                long cycles = spaceshipsCycles.sumThenReset();
+                long now = System.nanoTime();
+
+                double seconds = (double) (now - prevTime) * 1e-9;
+                double frames = (double) cycles / (double) N;
+
+                double fps = frames / seconds;
+                System.out.println(k + "\tRATE: " + fps + " fps");
+
+                prevTime = now;
+            }
+        } else {
+            for (int k = 0;; k++) {
+                cycleStart = System.nanoTime();
+
+                phaser.awaitAdvance(k);
+                //phaser.arriveAndAwaitAdvance();
+
+                float millis = millis(cycleStart);
+                if (timeStream != null)
+                    timeStream.println(k + "," + millis);
+
+                if (millis(cycleStart) < 10) // don't work too hard: if the cycle has taken less than 10 millis, wait a little.
+                    Thread.sleep(10 - (int) millis(cycleStart));
+
+                millis = millis(cycleStart);
+
+                System.out.println("CYCLE: " + millis + " millis ");
+            }
         }
-//        for (int k = 0;; k++) {
-//            cycleStart = System.nanoTime();
-//
-//            phaser.awaitAdvance(k);
-//
-//            float millis = millis(cycleStart);
-//            if (timeStream != null)
-//                timeStream.println(k + "," + millis);
-//
-//            if (millis(cycleStart) < 10) // don't work too hard: if the cycle has taken less than 10 millis, wait a little.
-//                Thread.sleep(10 - (int) millis(cycleStart));
-//
-//            millis = millis(cycleStart);
-//
-//            System.out.println("CYCLE: " + millis + " millis ");
-//        }
     }
 
     public long now() {
