@@ -24,9 +24,9 @@ configurations {
 }
     
 dependencies {
-    compile "co.paralleluniverse:spacebase-core:2.0-SNAPSHOT"
-    compile "co.paralleluniverse:quasar-core:0.3.0-SNAPSHOT"
-    compile "co.paralleluniverse:quasar-actors:0.3.0-SNAPSHOT"
+    compile "co.paralleluniverse:spacebase-core:2.0"
+    compile "co.paralleluniverse:quasar-core:0.3.0"
+    compile "co.paralleluniverse:quasar-actors:0.3.0"
     compile "com.codahale.metrics:metrics-core:3.0.0" 
     compile ":jogl-all",":gluegen-rt"
     runtime "com.google.guava:guava:14.0.1"
@@ -34,7 +34,7 @@ dependencies {
     // Download natives from https://jogamp.org/deployment/autobuilds/master/jogl-b899-2013-01-19_20-17-11/, https://jogamp.org/deployment/autobuilds/master/gluegen-b625-2013-01-19_07-06-09/
     runtime ":jogl-all-natives-linux-i586",":jogl-all-natives-macosx-universal",":jogl-all-natives-windows-i586",":jogl-all-natives-linux-amd64",":jogl-all-natives-windows-amd64"
     runtime ":gluegen-rt-natives-linux-i586",":gluegen-rt-natives-macosx-universal",":gluegen-rt-natives-windows-i586",":gluegen-rt-natives-linux-amd64",":gluegen-rt-natives-windows-amd64"
-    quasar  "co.paralleluniverse:quasar-core:0.3.0-SNAPSHOT"
+    quasar  "co.paralleluniverse:quasar-core:0.3.0"
 }
 
 task copyShaders(type:Copy) {
@@ -45,11 +45,13 @@ classes.dependsOn 'copyShaders'
 
 tasks.withType(JavaExec) {
     jvmArgs '-server'
+    jvmArgs "-javaagent:${configurations.quasar.iterator().next()}" // =vdmc (verbose, debug, allow monitors, check class)
+    // systemProperty "co.paralleluniverse.fibers.DefaultFiberPool.parallelism", "4"
+    systemProperty "co.paralleluniverse.fibers.DefaultFiberPool.monitor", "JMX" // "METRICS" // "NONE" //
+
+    // memory
     jvmArgs '-Xmx1024m'
     // jvmArgs '-XX:+UseG1GC', '-XX:MaxGCPauseMillis=50'
-    jvmArgs "-javaagent:${configurations.quasar.iterator().next()}" // =vdmc (verbose, debug, allow monitors, check class)
-    systemProperty "co.paralleluniverse.fibers.DefaultFiberPool.parallelism", "4"
-    systemProperty "co.paralleluniverse.fibers.DefaultFiberPool.monitor", "JMX" // "METRICS" // "NONE" //
     
     // profiling
     jvmArgs '-XX:+UnlockCommercialFeatures', '-XX:+FlightRecorder'
