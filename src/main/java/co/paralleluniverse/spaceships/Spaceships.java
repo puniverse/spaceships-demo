@@ -19,33 +19,30 @@
  */
 package co.paralleluniverse.spaceships;
 
+import co.paralleluniverse.actors.ActorSpec;
+import co.paralleluniverse.actors.behaviors.Supervisor;
+import co.paralleluniverse.actors.behaviors.SupervisorActor;
 import co.paralleluniverse.common.monitoring.Metrics;
-import co.paralleluniverse.db.api.DbExecutors;
-import co.paralleluniverse.db.api.Sync;
+import co.paralleluniverse.common.monitoring.MonitorType;
+import co.paralleluniverse.data.record.Record;
+import co.paralleluniverse.fibers.*;
 import co.paralleluniverse.spacebase.AABB;
-import co.paralleluniverse.spacebase.MutableAABB;
-import co.paralleluniverse.spacebase.SpaceBase;
-import co.paralleluniverse.spacebase.SpaceBaseBuilder;
-import co.paralleluniverse.spacebase.SpatialToken;
+import co.paralleluniverse.spacebase.quasar.SpaceBase;
+import co.paralleluniverse.spacebase.quasar.SpaceBaseBuilder;
 import co.paralleluniverse.spaceships.render.GLPort;
+import co.paralleluniverse.strands.concurrent.Phaser;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
-import java.io.FileReader;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
-import java.util.ArrayList;
 import java.util.Properties;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.RejectedExecutionHandler;
-import java.util.concurrent.SynchronousQueue;
-import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import jsr166e.LongAdder;
 
 public class Spaceships {
     public static Spaceships spaceships;
     public static final int POSTPONE_GLPORT_UNTIL_SB_CYCLE_UNDER_X_MILLIS = 250;
-    private static final int MAX_PORT_POSTPONE_MILLIS = 10000;
 
     /**
      * @param args the command line arguments
@@ -66,30 +63,30 @@ public class Spaceships {
 
         System.out.println("Running...");
         spaceships.run();
+
+        Thread.sleep(100000);
     }
     //
-    private static final int CLEANUP_THREADS = 2;
-    public final SpaceBase<Spaceship> sb;
-    public final boolean extrapolate;
+    private final GLPort.Toolkit toolkit;
+    public final SpaceBase<Record<SpaceshipState>> sb;
+    private GLPort port = null;
     public final RandSpatial random;
+    //
+    private final int N;
     public final AABB bounds;
+    public final boolean extrapolate;
     public final double speedVariance;
-    public final boolean parallel;
-    public final boolean async;
     public final double range;
+    private final Phaser phaser;
     private File metricsDir;
     private PrintStream configStream;
     private PrintStream timeStream;
-    private final GLPort.Toolkit toolkit;
-    private final int N;
-    private final ExecutorService executor;
-    private final ArrayList<Spaceship> ships = new ArrayList<>(10000);
+    final LongAdder spaceshipsCycles = new LongAdder();
+    //
     private long cycleStart;
-    private GLPort port = null;
 
     public Spaceships(Properties props) throws Exception {
-        this.parallel = Boolean.parseBoolean(props.getProperty("parallel", "false"));
-        this.async = Boolean.parseBoolean(props.getProperty("async", "true"));
+        final int parallelism = DefaultFiberScheduler.getInstance().getFjPool().getParallelism();// Integer.parseInt(props.getProperty("parallelism", "2"));
         double b = Double.parseDouble(props.getProperty("world-length", "20000"));
         this.bounds = AABB.create(-b / 2, b / 2, -b / 2 * 0.7, b / 2 * 0.7, -b / 2, b / 2);
         this.N = Integer.parseInt(props.getProperty("N", "10000"));
@@ -97,46 +94,26 @@ public class Spaceships {
         this.range = Double.parseDouble(props.getProperty("radar-range", "10"));
         this.extrapolate = Boolean.parseBoolean(props.getProperty("extrapolate", "true"));
 
+        this.phaser = Boolean.parseBoolean(props.getProperty("phaser", "false")) ? new Phaser() : null;
+        
         if (props.getProperty("dir") != null) // collect performance metrics in csv files
             createMetricsFiles(props);
 
         println("World bounds: " + bounds);
         println("N: " + N);
-
-        this.executor = (!parallel ? createThreadPool(props) : null);
+        println("Parallelism: " + parallelism);
+        println("Phaser: " + (phaser != null));
+        println("Extrapolate: " + extrapolate);
+        println();
+        
         this.random = new RandSpatial();
 
-        // create all spaceships
-        for (int i = 0; i < N; i++)
-            ships.add(new Spaceship(this));
-
         this.sb = initSpaceBase(props);
+        // sb.setDefaultTimeoutMillis(1000);
+
         this.toolkit = GLPort.Toolkit.valueOf(props.getProperty("ui-component", "NEWT").toUpperCase());
 
         println("UI Component: " + toolkit);
-    }
-
-    /**
-     * create a thread-pool for running in concurrent mode
-     */
-    private ExecutorService createThreadPool(Properties props) throws NumberFormatException {
-        final int numThreads = Integer.parseInt(props.getProperty("parallelism", "2")) - CLEANUP_THREADS;
-        return new ThreadPoolExecutor(numThreads, numThreads, 0L, TimeUnit.MILLISECONDS, new SynchronousQueue<Runnable>(), new RejectedExecutionHandler() {
-            @Override
-            public void rejectedExecution(Runnable r, ThreadPoolExecutor executor) {
-                try {
-                    executor.getQueue().put(r);
-                } catch (InterruptedException ex) {
-                    throw new RuntimeException(ex);
-                }
-            }
-        }) {
-            @Override
-            protected void afterExecute(Runnable r, Throwable t) {
-                if (t != null)
-                    t.printStackTrace();
-            }
-        };
     }
 
     private void createMetricsFiles(Properties props) throws FileNotFoundException {
@@ -155,20 +132,22 @@ public class Spaceships {
         this.timeStream = new PrintStream(new FileOutputStream(timeFile), true);
     }
 
+    public co.paralleluniverse.spacebase.SpaceBase<Record<SpaceshipState>> getPlainSpaceBase() {
+        return co.paralleluniverse.spacebase.SpaceBaseBuilder.from(sb);
+    }
+
     /**
      * reads properties file and creates a SpaceBase instance with the requested properties.
      */
-    private SpaceBase<Spaceship> initSpaceBase(Properties props) {
+    private SpaceBase<Record<SpaceshipState>> initSpaceBase(Properties props) {
         final boolean optimistic = Boolean.parseBoolean(props.getProperty("optimistic", "true"));
         final int optimisticHeight = Integer.parseInt(props.getProperty("optimistic-height", "1"));
         final int optimisticRetryLimit = Integer.parseInt(props.getProperty("optimistic-retry-limit", "3"));
-        final int parallelism = Integer.parseInt(props.getProperty("parallelism", "2"));
         final boolean compressed = Boolean.parseBoolean(props.getProperty("compressed", "false"));
         final boolean singlePrecision = Boolean.parseBoolean(props.getProperty("single-precision", "false"));
         final int nodeWidth = Integer.parseInt(props.getProperty("node-width", "10"));
 
-        println("Parallel: " + parallel);
-        println("Parallelism: " + parallelism);
+        println("SpaceBase properties");
         println("Optimistic: " + optimistic);
         println("Optimistic height: " + optimisticHeight);
         println("Optimistic retry limit: " + optimisticRetryLimit);
@@ -178,11 +157,6 @@ public class Spaceships {
         println();
 
         SpaceBaseBuilder builder = new SpaceBaseBuilder();
-
-        if (parallel)
-            builder.setExecutor(DbExecutors.parallel(parallelism));
-        else
-            builder.setExecutor(DbExecutors.concurrent(CLEANUP_THREADS));
 
         builder.setQueueBackpressure(1000);
 
@@ -196,7 +170,7 @@ public class Spaceships {
         builder.setSinglePrecision(singlePrecision).setCompressed(compressed);
         builder.setNodeWidth(nodeWidth);
 
-        builder.setMonitoringType(SpaceBaseBuilder.MonitorType.JMX);
+        builder.setMonitoringType(MonitorType.JMX);
         if (metricsDir != null) {
             com.codahale.metrics.CsvReporter.forRegistry(Metrics.registry())
                     .convertRatesTo(TimeUnit.SECONDS)
@@ -205,7 +179,7 @@ public class Spaceships {
                     .start(1, TimeUnit.SECONDS);
         }
 
-        final SpaceBase<Spaceship> space = builder.build("base1");
+        final SpaceBase<Record<SpaceshipState>> space = builder.build("base1");
         return space;
     }
 
@@ -213,89 +187,60 @@ public class Spaceships {
      * Main loop: loops over all spaceships and initiates each spaceship's actions. Simulates an IO thread receiving commands over the net.
      */
     private void run() throws Exception {
-        // insert all spaceships into SB
-        {
-            System.out.println("Inserting " + N + " spaceships");
-            long insrertStart = System.nanoTime();
-            for (Spaceship s : ships) {
-                insertSpaceship(s);
+        final Supervisor sup = new SupervisorActor(SupervisorActor.RestartStrategy.ONE_FOR_ONE) {
+            @Override
+            protected void init() throws InterruptedException, SuspendExecution {
+                for (int i = 0; i < N; i++)
+                    addChild(new Supervisor.ChildSpec("ship-" + i, Supervisor.ChildMode.PERMANENT, 5, 1, TimeUnit.SECONDS, 3, ActorSpec.of(Spaceship.class, Spaceships.this, i, phaser)));
             }
-            System.out.println("Inserted " + N + " things in " + millis(insrertStart));
-        }
-        long initTime = System.nanoTime();
+        }.spawn();
+
+        Thread.sleep(5000); // wait for things to optimize a bit.
+        port = new GLPort(toolkit, N + 20, Spaceships.this, bounds);
+
+//        LocalActorUtil.join(sup);
+//        System.exit(1);
 
         if (timeStream != null)
             timeStream.println("# time, millis, millis1, millis0");
 
-        sb.setCurrentThreadAsynchronous(async);
+        if (true || phaser == null) {
+            long prevTime = System.nanoTime();
+            for (int k = 0;; k++) {
+                Thread.sleep(1000);
+                long cycles = spaceshipsCycles.sumThenReset();
+                long now = System.nanoTime();
 
-        for (int k = 0;; k++) {
-            cycleStart = System.nanoTime();
+                double seconds = (double) (now - prevTime) * 1e-9;
+                double frames = (double) cycles / (double) N;
 
-            for (final Spaceship s : ships) {
-                final Runnable command = new Runnable() {
-                    @Override
-                    public void run() {
-                        try {
-                            s.join(); // wait for this spaceship's previous action (from the previous cycle) to complete
-                            final Sync sync = s.run(Spaceships.this);
-                            s.setSync(sync);
-                        } catch (InterruptedException e) {
-                            throw new RuntimeException(e);
-                        }
-                    }
-                };
+                double fps = frames / seconds;
+                System.out.println(k + "\tRATE: " + fps + " fps");
 
-                if (executor == null)
-                    command.run();
-                else
-                    executor.submit(command);
+                prevTime = now;
             }
+        } else {
+            for (int k = 0;; k++) {
+                cycleStart = System.nanoTime();
 
-            float millis = millis(cycleStart);
-            if (timeStream != null)
-                timeStream.println(k + "," + millis);
+                phaser.awaitAdvance(k);
+                //phaser.arriveAndAwaitAdvance();
 
-            if (millis(cycleStart) < 10) // don't work too hard: if the cycle has taken less than 10 millis, wait a little.
-                Thread.sleep(10 - (int) millis(cycleStart));
+                float millis = millis(cycleStart);
+                if (timeStream != null)
+                    timeStream.println(k + "," + millis);
 
-            millis = millis(cycleStart);
+                if (millis(cycleStart) < 10) // don't work too hard: if the cycle has taken less than 10 millis, wait a little.
+                    Thread.sleep(10 - (int) millis(cycleStart));
 
-            if (port == null
-                    & (millis < POSTPONE_GLPORT_UNTIL_SB_CYCLE_UNDER_X_MILLIS
-                    | millis(initTime) > MAX_PORT_POSTPONE_MILLIS)) // wait for JIT to make everything run smoothly before opening port
-                port = new GLPort(toolkit, N, Spaceships.this, bounds);
+                millis = millis(cycleStart);
 
-            System.out.println("CYCLE: " + millis + " millis " + (executor != null && executor instanceof ThreadPoolExecutor ? " executorQueue: " + ((ThreadPoolExecutor) executor).getQueue().size() : ""));
+                System.out.println("CYCLE: " + millis + " millis ");
+            }
         }
     }
 
-    public ArrayList<Spaceship> getShips() {
-        return ships;
-    }
-
-    public void insertSpaceship(Spaceship s) throws InterruptedException {
-        if (!ships.contains(s))
-            ships.add(s);
-        MutableAABB aabb = MutableAABB.create(2);
-        s.getAABB(aabb);
-        final SpatialToken token = sb.insert(s, aabb);
-        token.join();
-        s.setToken(token);
-    }
-
-    public void deleteSpaceship(Spaceship toRemove) {
-        final Spaceship s = new Spaceship(this);
-        ships.set(ships.indexOf(toRemove), s);
-        sb.delete(toRemove.getToken());
-        s.setToken(sb.insert(s, s.getAABB()));
-    }
-
-    public long getCycleStart() {
-        return cycleStart;
-    }
-
-    long currentTime() {
+    public long now() {
         return System.currentTimeMillis();
     }
 

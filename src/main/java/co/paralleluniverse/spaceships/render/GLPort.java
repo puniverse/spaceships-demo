@@ -19,6 +19,9 @@
  */
 package co.paralleluniverse.spaceships.render;
 
+import co.paralleluniverse.data.record.Record;
+import co.paralleluniverse.data.record.RecordArray;
+import co.paralleluniverse.data.record.Records;
 import co.paralleluniverse.spacebase.AABB;
 import static co.paralleluniverse.spacebase.AABB.X;
 import static co.paralleluniverse.spacebase.AABB.Y;
@@ -29,6 +32,8 @@ import co.paralleluniverse.spacebase.SpatialQuery;
 import co.paralleluniverse.spacebase.SpatialToken;
 import co.paralleluniverse.spacebase.SpatialVisitor;
 import co.paralleluniverse.spaceships.Spaceship;
+import co.paralleluniverse.spaceships.SpaceshipState;
+import static co.paralleluniverse.spaceships.SpaceshipState.*;
 import co.paralleluniverse.spaceships.Spaceships;
 import com.jogamp.newt.awt.NewtCanvasAWT;
 import com.jogamp.newt.opengl.GLWindow;
@@ -40,11 +45,11 @@ import com.jogamp.opengl.util.texture.Texture;
 import com.jogamp.opengl.util.texture.TextureIO;
 import java.awt.Component;
 import java.awt.Frame;
-import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.FloatBuffer;
-import java.util.Collection;
-import java.util.Collections;
+import java.util.Arrays;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import javax.media.opengl.DebugGL3;
 import javax.media.opengl.GL;
 import javax.media.opengl.GL2ES2;
@@ -67,20 +72,21 @@ import javax.media.opengl.fixedfunc.GLMatrixFunc;
  * @author pron
  */
 public class GLPort implements GLEventListener {
-    public static final int WINDOW_WIDTH = 1200;
-    public static final int WINDOW_HEIGHT = 700;
-    public static final double ZOOM_UNIT = 0.1;
-    public static final int ANIMATION_DURATION = 200;
-    public static final int SHOOT_DURATION = 100;
-    public static final float EXPLOSION_DURATION = 1000f;
-    public static final int MAX_EXTRAPOLATION_DURATION = 1000;
-    public static final int SB_QUERY_RATE = 250;
-    public static final int WIDTH_MARGINS = 800;
-    public static final int MAX_PORT_WIDTH = 400;
-    public static final String WINDOW_TITLE = "Spaceships";
-    private long lastSBQueryTime = 0;
-    private Collection<Object> lastSBQueryResult = null;
-    private long lastSBCycleStart = 0;
+    public enum Toolkit {
+        NEWT, NEWT_CANVAS, AWT
+    };
+    private static final int WINDOW_WIDTH = 1200;
+    private static final int WINDOW_HEIGHT = 700;
+    private static final double ZOOM_UNIT = 0.1;
+    private static final int ANIMATION_DURATION = 200;
+    private static final int SHOOT_DURATION = 100;
+    private static final float EXPLOSION_DURATION = 1000f;
+    private static final int MAX_EXTRAPOLATION_DURATION = 1000;
+    private static final int SB_QUERY_RATE = 100;
+    private static final int WIDTH_MARGINS = 800;
+    private static final int MAX_PORT_WIDTH = 400;
+    private static final String WINDOW_TITLE = "Spaceships";
+    //
     private Texture spaceshipTex;
     private Texture explosionTex;
     private ShaderProgram shaderProgram;
@@ -91,50 +97,12 @@ public class GLPort implements GLEventListener {
     private double portMinXAnimation = 0;
     private double portMaxYAnimation = 0;
     private double portMinYAnimation = 0;
-    private double heading = 0;
-
-    private MutableAABB getCurrentPort(final long ct) {
-        if (portMaxXAnimation == 0)
-            return port;
-        MutableAABB currentPort = MutableAABB.create(2);
-        final double width = port.max(X) - port.min(X);
-        final double height = port.max(Y) - port.min(Y);
-        final double ratio = height / width;
-        double animation = Math.min(1.0, (double) (ct - portAnimationStartTime) / ANIMATION_DURATION);
-        currentPort.min(X, port.min(X) + animation * portMinXAnimation);
-        currentPort.min(Y, port.min(Y) + animation * portMinYAnimation);
-        currentPort.max(X, port.max(X) + animation * portMaxXAnimation);
-        currentPort.max(Y, port.max(Y) + animation * portMaxYAnimation);
-        return currentPort;
-    }
-
-    private void fixPort(final long ct, boolean onlyIfFinished) {
-        final double width = port.max(X) - port.min(X);
-        final double height = port.max(Y) - port.min(Y);
-        final double ratio = height / width;
-        double animation = Math.min(1.0, (double) (ct - portAnimationStartTime) / ANIMATION_DURATION);
-        if (onlyIfFinished & animation < 1.0)
-            return;
-        port.min(X, port.min(X) + animation * portMinXAnimation);
-        port.min(Y, port.min(Y) + animation * portMinYAnimation);
-        port.max(X, port.max(X) + animation * portMaxXAnimation);
-        port.max(Y, port.max(Y) + animation * portMaxYAnimation);
-        portMaxXAnimation -= animation * portMaxXAnimation;
-        portMinXAnimation -= animation * portMinXAnimation;
-        portMaxYAnimation -= animation * portMaxYAnimation;
-        portMinYAnimation -= animation * portMinYAnimation;
-        portAnimationStartTime = ct;
-    }
-
-    public enum Toolkit {
-        NEWT, NEWT_CANVAS, AWT
-    };
     private final Toolkit TOOLKIT;
     //
     private static final float KEY_PRESS_TRANSLATE = 10.0f;
     private final Object window;
     private final int maxItems;
-    private final SpaceBase<Spaceship> sb;
+    private final SpaceBase<Record<SpaceshipState>> sb;
     private final AABB bounds;
     private MutableAABB port = MutableAABB.create(2);
     private ProgramState shaderState;
@@ -142,9 +110,12 @@ public class GLPort implements GLEventListener {
     private VBO vertices;
     private VBO colors;
     private PMVMatrix pmv = new PMVMatrix();
-    private float x = 1.0f;
     private final FPSAnimator animator;
     private final Spaceships global;
+    private long lastQueryTime = 0;
+    private long lastDispTime = 0;
+    private final AtomicInteger indexGen = new AtomicInteger();
+    private final RecordArray<SpaceshipState> ships;
 
     static {
         GLProfile.initSingleton();
@@ -154,8 +125,10 @@ public class GLPort implements GLEventListener {
         TOOLKIT = toolkit;
         this.maxItems = maxItems;
         this.global = global;
-        this.sb = global.sb;
+        this.sb = global.getPlainSpaceBase();
         this.bounds = bounds;
+
+        this.ships = SpaceshipState.stateType.newArray(maxItems);
 
         final GLProfile glp = GLProfile.get(GLProfile.GL3);
         final GLCapabilitiesImmutable glcaps = (GLCapabilitiesImmutable) new GLCapabilities(glp);
@@ -190,7 +163,7 @@ public class GLPort implements GLEventListener {
         }
 
         drawable.addGLEventListener(this);
-        animator = new FPSAnimator(drawable, 60);
+        animator = new FPSAnimator(drawable, 30);
 
         if (TOOLKIT == Toolkit.NEWT) {
             final GLWindow window = (GLWindow) drawable;
@@ -321,98 +294,79 @@ public class GLPort implements GLEventListener {
         vertices.destroy(gl);
     }
 
-    public Collection<Object> query(SpatialQuery<? super Spaceship> query) {
-        try {
-            final Collection<Object> resultSet = sb.createCollection();
-            sb.query(query, new SpatialVisitor<Spaceship>() {
-                @Override
-                public void visit(Spaceship elem, SpatialToken token) {
-                    resultSet.add(elem);
-                }
-
-                @Override
-                public void done() {
-                }
-            }).join();
-            return Collections.unmodifiableCollection(resultSet);
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
-    }
-
     @Override
     public void display(GLAutoDrawable drawable) {
-        final GL3 gl = drawable.getGL().getGL3();
-        shaderState.bind(gl);
-        vao.bind(gl);
-        int spaceshipLoc = gl.glGetUniformLocation(shaderProgram.program(), "spaceshipTex");
-        gl.glUniform1i(spaceshipLoc, 0);
-        gl.glActiveTexture(GL.GL_TEXTURE0);
-        gl.glBindTexture(GL.GL_TEXTURE_2D, spaceshipTex.getTextureObject(gl));
+        try {
+            final GL3 gl = drawable.getGL().getGL3();
+            shaderState.bind(gl);
+            vao.bind(gl);
+            int spaceshipLoc = gl.glGetUniformLocation(shaderProgram.program(), "spaceshipTex");
+            gl.glUniform1i(spaceshipLoc, 0);
+            gl.glActiveTexture(GL.GL_TEXTURE0);
+            gl.glBindTexture(GL.GL_TEXTURE_2D, spaceshipTex.getTextureObject(gl));
 
-        int explosionLoc = gl.glGetUniformLocation(shaderProgram.program(), "explosionTex");
-        gl.glUniform1i(explosionLoc, 1);
-        gl.glActiveTexture(GL.GL_TEXTURE0 + 1);
-        gl.glBindTexture(GL.GL_TEXTURE_2D, explosionTex.getTextureObject(gl));
+            int explosionLoc = gl.glGetUniformLocation(shaderProgram.program(), "explosionTex");
+            gl.glUniform1i(explosionLoc, 1);
+            gl.glActiveTexture(GL.GL_TEXTURE0 + 1);
+            gl.glBindTexture(GL.GL_TEXTURE_2D, explosionTex.getTextureObject(gl));
 
-        vertices.clear();
-        colors.clear();
-        final FloatBuffer verticesb = (FloatBuffer) vertices.getBuffer();
-        final FloatBuffer colorsb = (FloatBuffer) colors.getBuffer();
-        long ct = System.currentTimeMillis();
-        fixPort(ct, true);
-        MutableAABB currentPort = getCurrentPort(ct);
-        portToMvMatrix(currentPort);
-        double margins = WIDTH_MARGINS;
-        if (ct - lastSBQueryTime > SB_QUERY_RATE | lastSBCycleStart != global.getCycleStart()) {
-            lastSBQueryTime = ct;
-            lastSBQueryResult = query(SpatialQueries.contained(AABB.create(currentPort.min(X) - margins, currentPort.max(X) + margins, currentPort.min(Y) - margins, currentPort.max(Y) + margins)));
-            lastSBCycleStart = global.getCycleStart();
-        }
-        double[] pos;
-        int countInPort = 0;
-        for (Object o : lastSBQueryResult) {
-            Spaceship s = (Spaceship) o;
-            if (s.getLastMoved() > 0) {
-                long exrapolationTime;
+            vertices.clear();
+            colors.clear();
+            final FloatBuffer verticesb = (FloatBuffer) vertices.getBuffer();
+            final FloatBuffer colorsb = (FloatBuffer) colors.getBuffer();
+            long now = global.now();
+            fixPort(now, true);
+            MutableAABB currentPort = getCurrentPort(now);
+            portToMvMatrix(currentPort);
+            double margins = WIDTH_MARGINS;
 
-                if (global.extrapolate)
-                    // don't extrapolate spaceships that have npt been moved a long time
-                    exrapolationTime = Math.min(ct, s.getLastMoved() + MAX_EXTRAPOLATION_DURATION);
-                else
-                    exrapolationTime = s.getLastMoved();
-                pos = s.getCurrentPosition(exrapolationTime);
-                verticesb.put((float) pos[0]);
-                verticesb.put((float) pos[1]);
-
-                if (s.getBlowTime() > 0) { // 0.01 - start blow animation, 1.0 - end od animation
-                    colorsb.put(Math.min(1.0f, (ct - s.getBlowTime()) / EXPLOSION_DURATION));
-                } else
-                    colorsb.put(0); // regular ship without blow
-                colorsb.put((float) s.getCurrentHeading(exrapolationTime));
-
-                // put the shootLength (0 for ship wihout shoot)
-                colorsb.put(ct - s.getShootTime() < SHOOT_DURATION ? (float) s.getShootLength() : 0f);
+            final int n;
+            if (now - lastQueryTime > SB_QUERY_RATE) {
+                n = query(now, SpatialQueries.contained(AABB.create(currentPort.min(X) - margins, currentPort.max(X) + margins, currentPort.min(Y) - margins, currentPort.max(Y) + margins)));
+                lastQueryTime = now;
+            } else {
+                n = indexGen.get();
+                lastDispTime = now;
             }
-            if (port.contains(s.getAABB()))
-                countInPort++;
+
+            int countInPort = 0;
+            for (Record<SpaceshipState> s : ships.slice(0, n)) {
+                long extrapolationTime = global.extrapolate ? Math.min(now, s.get($lastMoved) + MAX_EXTRAPOLATION_DURATION) : s.get($lastMoved);
+                Spaceship.getCurrentLocation(s, extrapolationTime, verticesb);
+
+                if (s.get($blowTime) > 0)  // 0.01 - start blow animation, 1.0 - end of animation
+                    colorsb.put(Math.min(1.0f, (now - s.get($blowTime)) / EXPLOSION_DURATION));
+                else
+                    colorsb.put(0); // ship isn't blowing up
+                colorsb.put((float) Spaceship.getCurrentHeading(s, extrapolationTime));
+
+                // put the shotLength (0 for ship that's not firing)
+                colorsb.put(now - s.get($timeFired) < SHOOT_DURATION ? (float) s.get($shotLength) : 0f);
+
+                if (portContains(s.get($x), s.get($y)))
+                    countInPort++;
+            }
+            setTitle("" + countInPort + " Spaceships " + (int) (port.max(X) - port.min(X)) + "x" + (int) (port.max(Y) - port.min(Y)));
+
+            vertices.flip();
+            colors.flip();
+
+            int numElems = verticesb.limit() / 2;
+            vertices.write(gl, 0, numElems);
+            colors.write(gl, 0, numElems);
+
+            shaderState.setUniform(gl, "in_Matrix", 4, 4, pmv.glGetMvMatrixf());
+
+            gl.glClear(GL3.GL_COLOR_BUFFER_BIT);
+            gl.glDrawArrays(GL3.GL_POINTS, 0, numElems);
+
+            vao.unbind(gl);
+            shaderState.unbind(gl);
+        } catch (Throwable t) {
+            System.err.println("XXXXXX");
+            t.printStackTrace();
+            throw t;
         }
-        setTitle(""+countInPort+ " Spaceships " + (int)(port.max(X) - port.min(X)) + "x" + (int)(port.max(Y) - port.min(Y)) );            
-
-        vertices.flip();
-        colors.flip();
-
-        int numElems = verticesb.limit() / 2;
-        vertices.write(gl, 0, numElems);
-        colors.write(gl, 0, numElems);
-
-        shaderState.setUniform(gl, "in_Matrix", 4, 4, pmv.glGetMvMatrixf());
-
-        gl.glClear(GL3.GL_COLOR_BUFFER_BIT);
-        gl.glDrawArrays(GL3.GL_POINTS, 0, numElems);
-
-        vao.unbind(gl);
-        shaderState.unbind(gl);
     }
 
     @Override
@@ -425,6 +379,41 @@ public class GLPort implements GLEventListener {
         drawableHeight = height;
         drawableWidth = width;
         portToMvMatrix(port);
+    }
+
+    private int query(final long currentTime, SpatialQuery<? super Record<SpaceshipState>> query) {
+        final int lastCount = indexGen.get();
+        indexGen.set(0);
+
+        final long start = System.nanoTime();
+        sb.query(query, new SpatialVisitor<Record<SpaceshipState>>() {
+            @Override
+            public void visit(Record<SpaceshipState> s, SpatialToken st) {
+                if (s.get($lastMoved) == 0)
+                    return;
+
+                final int index = indexGen.getAndIncrement();
+                Records.copy(s, ships.at(index));
+            }
+
+            @Override
+            public void done() {
+            }
+        });
+        final long elapsedMicroseconds = TimeUnit.MICROSECONDS.convert(System.nanoTime() - start, TimeUnit.NANOSECONDS);
+        // System.out.println("=== " + elapsedMicroseconds + " - " + DefaultFiberPool.getInstance().getQueuedSubmissionCount() + " " + DefaultFiberPool.getInstance().getQueuedTaskCount());
+
+        final int count = indexGen.get();
+
+        if (lastCount > count)
+            Records.clear(ships.slice(count, lastCount));
+
+        return count;
+    }
+
+    private boolean portContains(double x, double y) {
+        return x >= port.min(X) && x <= port.max(X)
+                && y >= port.min(Y) && y <= port.max(Y);
     }
 
     private void movePort(boolean horizontal, double units) {
@@ -486,6 +475,39 @@ public class GLPort implements GLEventListener {
                 portMinYAnimation -= heightToAdd;
             }
         }
+    }
+
+    private MutableAABB getCurrentPort(final long ct) {
+        if (portMaxXAnimation == 0)
+            return port;
+        MutableAABB currentPort = MutableAABB.create(2);
+        final double width = port.max(X) - port.min(X);
+        final double height = port.max(Y) - port.min(Y);
+        final double ratio = height / width;
+        double animation = Math.min(1.0, (double) (ct - portAnimationStartTime) / ANIMATION_DURATION);
+        currentPort.min(X, port.min(X) + animation * portMinXAnimation);
+        currentPort.min(Y, port.min(Y) + animation * portMinYAnimation);
+        currentPort.max(X, port.max(X) + animation * portMaxXAnimation);
+        currentPort.max(Y, port.max(Y) + animation * portMaxYAnimation);
+        return currentPort;
+    }
+
+    private void fixPort(final long ct, boolean onlyIfFinished) {
+        final double width = port.max(X) - port.min(X);
+        final double height = port.max(Y) - port.min(Y);
+        final double ratio = height / width;
+        double animation = Math.min(1.0, (double) (ct - portAnimationStartTime) / ANIMATION_DURATION);
+        if (onlyIfFinished & animation < 1.0)
+            return;
+        port.min(X, port.min(X) + animation * portMinXAnimation);
+        port.min(Y, port.min(Y) + animation * portMinYAnimation);
+        port.max(X, port.max(X) + animation * portMaxXAnimation);
+        port.max(Y, port.max(Y) + animation * portMaxYAnimation);
+        portMaxXAnimation -= animation * portMaxXAnimation;
+        portMinXAnimation -= animation * portMinXAnimation;
+        portMaxYAnimation -= animation * portMaxYAnimation;
+        portMinYAnimation -= animation * portMinYAnimation;
+        portAnimationStartTime = ct;
     }
 
     public void myKeyPressed(int keyCode) {
@@ -622,7 +644,6 @@ public class GLPort implements GLEventListener {
         public void mouseDragged(com.jogamp.newt.event.MouseEvent e) {
         }
     }
-
 //    private void print(FloatBuffer buffer) {
 //        int pos = buffer.position();
 //        System.err.print(buffer.remaining() + ": ");

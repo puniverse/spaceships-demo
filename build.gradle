@@ -3,56 +3,81 @@ apply plugin: 'application'
 sourceCompatibility = '1.7'
 [compileJava, compileTestJava]*.options*.encoding = 'UTF-8'
 
-version = "1.0-SNAPSHOT"
+version = "2.0-SNAPSHOT"
 
-// NetBeans will automatically add "run" and "debug" tasks relying on the
-// "mainClass" property. You may however define the property prior executing
-// tasks by passing a "-PmainClass=<QUALIFIED_CLASS_NAME>" argument.
-//
-// Note however, that you may define your own "run" and "debug" task if you
-// prefer. In this case NetBeans will not add these tasks but you may rely on
-// your own implementation.
 mainClassName = 'co.paralleluniverse.spaceships.Spaceships'
+ext.mainClass = mainClassName
 
-if (!hasProperty('mainClass')) {
-    ext.mainClass = mainClassName
-}
-
-dependencies {
-    compile ":spacebase"
-    compile ":jsr166e"
-    compile "co.paralleluniverse:quasar:0.2-SNAPSHOT"
-    compile "com.codahale.metrics:metrics-core:3.0.0-RC1" 
-    compile ":jogl-all",":gluegen-rt"
-    runtime ":padlock:2.2"
-    runtime ":commons-codec:1.3" 
-    runtime "com.google.guava:guava:11.0.1"
-    runtime "net.sf.trove4j:trove4j:3.0.2"        
-    // Download natives from https://jogamp.org/deployment/autobuilds/master/jogl-b899-2013-01-19_20-17-11/
-    // Download natives from https://jogamp.org/deployment/autobuilds/master/gluegen-b625-2013-01-19_07-06-09/
-    runtime ":jogl-all-natives-linux-i586",":jogl-all-natives-macosx-universal",":jogl-all-natives-windows-i586",":jogl-all-natives-linux-amd64",":jogl-all-natives-windows-amd64"
-    runtime ":gluegen-rt-natives-linux-i586",":gluegen-rt-natives-macosx-universal",":gluegen-rt-natives-windows-i586",":gluegen-rt-natives-linux-amd64",":gluegen-rt-natives-windows-amd64"
-}
 repositories {
-    flatDir {
-        dirs 'baselib'
-    }
+    flatDir { dirs 'baselib' }
     repositories {
         mavenCentral()
-        maven {
-            url "https://oss.sonatype.org/content/repositories/snapshots"
-        }
+        mavenLocal()
+        maven { url "https://oss.sonatype.org/content/repositories/releases" }
+        maven { url "https://oss.sonatype.org/content/repositories/snapshots" }
+        maven { url "http://download.oracle.com/maven/" }
     }
 }
+
+configurations {
+    quasar
+}
+    
+dependencies {
+    compile "co.paralleluniverse:spacebase-core:2.0"
+    compile "co.paralleluniverse:quasar-core:0.3.0"
+    compile "co.paralleluniverse:quasar-actors:0.3.0"
+    compile "com.codahale.metrics:metrics-core:3.0.0" 
+    compile ":jogl-all",":gluegen-rt"
+    runtime "com.google.guava:guava:14.0.1"
+    runtime "net.sf.trove4j:trove4j:3.0.2"        
+    // Download natives from https://jogamp.org/deployment/autobuilds/master/jogl-b899-2013-01-19_20-17-11/, https://jogamp.org/deployment/autobuilds/master/gluegen-b625-2013-01-19_07-06-09/
+    runtime ":jogl-all-natives-linux-i586",":jogl-all-natives-macosx-universal",":jogl-all-natives-windows-i586",":jogl-all-natives-linux-amd64",":jogl-all-natives-windows-amd64"
+    runtime ":gluegen-rt-natives-linux-i586",":gluegen-rt-natives-macosx-universal",":gluegen-rt-natives-windows-i586",":gluegen-rt-natives-linux-amd64",":gluegen-rt-natives-windows-amd64"
+    quasar  "co.paralleluniverse:quasar-core:0.3.0"
+}
+
 task copyShaders(type:Copy) {
     from 'src/main/java/co/paralleluniverse/spaceships/render/shader'
     into 'build/classes/main/co/paralleluniverse/spaceships/render/shader'
 }
 classes.dependsOn 'copyShaders'
+
+tasks.withType(JavaExec) {
+    jvmArgs '-server'
+    jvmArgs "-javaagent:${configurations.quasar.iterator().next()}" // =vdmc (verbose, debug, allow monitors, check class)
+    // systemProperty "co.paralleluniverse.fibers.DefaultFiberPool.parallelism", "4"
+    systemProperty "co.paralleluniverse.fibers.DefaultFiberPool.monitor", "JMX" // "METRICS" // "NONE" //
+
+    // memory
+    jvmArgs '-Xmx1024m'
+    // jvmArgs '-XX:+UseG1GC', '-XX:MaxGCPauseMillis=50'
+    
+    // profiling
+    jvmArgs '-XX:+UnlockCommercialFeatures', '-XX:+FlightRecorder'
+    // jvmArgs '-verbose:gc'
+    // jvmArgs '-XX:+UnlockDiagnosticVMOptions', '-XX:+TraceClassLoading', '-XX:+LogCompilation' // use with jitwatch
+    // jvmArgs '-XX:+UnlockDiagnosticVMOptions', '-XX:+PrintInlining'
+    
+
+    // logging
+    systemProperty "log4j.configurationFile", "${rootProject.projectDir}/log4j.xml"
+    systemProperty "Log4jContextSelector", "org.apache.logging.log4j.core.async.AsyncLoggerContextSelector"
+    
+    // debugging
+    //jvmArgs '-ea'
+    // systemProperty "co.paralleluniverse.debugMode", "true"
+    systemProperty "co.paralleluniverse.globalFlightRecorder", "true"
+    systemProperty "co.paralleluniverse.flightRecorderDumpFile", "spaceships.log"
+    systemProperty "co.paralleluniverse.monitoring.flightRecorderSize","100000" 
+}
+
 task wrapper(type: Wrapper) {
     gradleVersion = '1.5-20130302103424+0000'
 }
-tasks.withType(JavaExec) {
-    jvmArgs '-Xmx1024m'
+
+task classpath << {
+    println configurations.runtime.files.join(':')
 }
+
 defaultTasks 'build','run'
