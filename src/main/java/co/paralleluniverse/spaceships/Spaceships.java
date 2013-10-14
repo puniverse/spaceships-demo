@@ -204,7 +204,7 @@ public class Spaceships {
         if (timeStream != null)
             timeStream.println("# time, millis, millis1, millis0");
 
-        if (phaser != null) {
+        if (true || phaser == null) {
             long prevTime = System.nanoTime();
             for (int k = 0;; k++) {
                 Thread.sleep(1000);

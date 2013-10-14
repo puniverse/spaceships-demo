@@ -48,7 +48,7 @@ tasks.withType(JavaExec) {
     jvmArgs '-Xmx1024m'
     // jvmArgs '-XX:+UseG1GC', '-XX:MaxGCPauseMillis=50'
     jvmArgs "-javaagent:${configurations.quasar.iterator().next()}" // =vdmc (verbose, debug, allow monitors, check class)
-    systemProperty "co.paralleluniverse.fibers.DefaultFiberPool.parallelism", "8"
+    systemProperty "co.paralleluniverse.fibers.DefaultFiberPool.parallelism", "4"
     systemProperty "co.paralleluniverse.fibers.DefaultFiberPool.monitor", "JMX" // "METRICS" // "NONE" //
     
     // profiling
