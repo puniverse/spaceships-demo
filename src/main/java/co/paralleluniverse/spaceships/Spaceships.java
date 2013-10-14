@@ -76,7 +76,6 @@ public class Spaceships {
     public final AABB bounds;
     public final boolean extrapolate;
     public final double speedVariance;
-    public final boolean async;
     public final double range;
     private final Phaser phaser;
     private File metricsDir;
@@ -88,7 +87,6 @@ public class Spaceships {
 
     public Spaceships(Properties props) throws Exception {
         final int parallelism = DefaultFiberScheduler.getInstance().getFjPool().getParallelism();// Integer.parseInt(props.getProperty("parallelism", "2"));
-        this.async = Boolean.parseBoolean(props.getProperty("async", "true"));
         double b = Double.parseDouble(props.getProperty("world-length", "20000"));
         this.bounds = AABB.create(-b / 2, b / 2, -b / 2 * 0.7, b / 2 * 0.7, -b / 2, b / 2);
         this.N = Integer.parseInt(props.getProperty("N", "10000"));
@@ -105,6 +103,7 @@ public class Spaceships {
         println("N: " + N);
         println("Parallelism: " + parallelism);
         println("Phaser: " + (phaser != null));
+        println("Extrapolate: " + extrapolate);
         println();
         
         this.random = new RandSpatial();
@@ -205,7 +204,7 @@ public class Spaceships {
         if (timeStream != null)
             timeStream.println("# time, millis, millis1, millis0");
 
-        if (true) {
+        if (phaser != null) {
             long prevTime = System.nanoTime();
             for (int k = 0;; k++) {
                 Thread.sleep(1000);

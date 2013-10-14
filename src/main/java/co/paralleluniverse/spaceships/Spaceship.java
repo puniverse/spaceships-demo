@@ -600,8 +600,6 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
     public static void getCurrentLocation(Record<SpaceshipState> s, long currentTime, FloatBuffer buffer) {
         double dt = (double) (currentTime - s.get($lastMoved)) / TimeUnit.SECONDS.toMillis(1);
         double dext = (double) (currentTime - s.get($exVelocityUpdated)) / TimeUnit.SECONDS.toMillis(1);
-        dt = Math.min(dt, 0.5);     // don't extrapolate over 0.5 second
-        dext = Math.min(dext, 0.5); // don't extrapolate over 0.5 second
         
         double currentX = s.get($x);
         double currentY = s.get($y);
@@ -625,7 +623,6 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
 
     public static double getCurrentHeading(Record<SpaceshipState> s, long currentTime) {
         double dt = (double) (currentTime - s.get($lastMoved)) / TimeUnit.SECONDS.toMillis(1);
-        dt = Math.min(dt, 0.5); // don't extrapolate over 0.5 second
 
         double currentVx = s.get($vx);
         double currentVy = s.get($vy);

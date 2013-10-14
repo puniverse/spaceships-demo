@@ -22,7 +22,6 @@ package co.paralleluniverse.spaceships.render;
 import co.paralleluniverse.data.record.Record;
 import co.paralleluniverse.data.record.RecordArray;
 import co.paralleluniverse.data.record.Records;
-import co.paralleluniverse.fibers.DefaultFiberPool;
 import co.paralleluniverse.spacebase.AABB;
 import static co.paralleluniverse.spacebase.AABB.X;
 import static co.paralleluniverse.spacebase.AABB.Y;
@@ -76,17 +75,17 @@ public class GLPort implements GLEventListener {
     public enum Toolkit {
         NEWT, NEWT_CANVAS, AWT
     };
-    public static final int WINDOW_WIDTH = 1200;
-    public static final int WINDOW_HEIGHT = 700;
-    public static final double ZOOM_UNIT = 0.1;
-    public static final int ANIMATION_DURATION = 200;
-    public static final int SHOOT_DURATION = 100;
-    public static final float EXPLOSION_DURATION = 1000f;
-    public static final int MAX_EXTRAPOLATION_DURATION = 1000;
-    public static final int SB_QUERY_RATE = 100;
-    public static final int WIDTH_MARGINS = 800;
-    public static final int MAX_PORT_WIDTH = 400;
-    public static final String WINDOW_TITLE = "Spaceships";
+    private static final int WINDOW_WIDTH = 1200;
+    private static final int WINDOW_HEIGHT = 700;
+    private static final double ZOOM_UNIT = 0.1;
+    private static final int ANIMATION_DURATION = 200;
+    private static final int SHOOT_DURATION = 100;
+    private static final float EXPLOSION_DURATION = 1000f;
+    private static final int MAX_EXTRAPOLATION_DURATION = 1000;
+    private static final int SB_QUERY_RATE = 100;
+    private static final int WIDTH_MARGINS = 800;
+    private static final int MAX_PORT_WIDTH = 400;
+    private static final String WINDOW_TITLE = "Spaceships";
     //
     private Texture spaceshipTex;
     private Texture explosionTex;
@@ -332,13 +331,14 @@ public class GLPort implements GLEventListener {
 
             int countInPort = 0;
             for (Record<SpaceshipState> s : ships.slice(0, n)) {
-                Spaceship.getCurrentLocation(s, now, verticesb);
+                long extrapolationTime = global.extrapolate ? Math.min(now, s.get($lastMoved) + MAX_EXTRAPOLATION_DURATION) : s.get($lastMoved);
+                Spaceship.getCurrentLocation(s, extrapolationTime, verticesb);
 
                 if (s.get($blowTime) > 0)  // 0.01 - start blow animation, 1.0 - end of animation
                     colorsb.put(Math.min(1.0f, (now - s.get($blowTime)) / EXPLOSION_DURATION));
                 else
                     colorsb.put(0); // ship isn't blowing up
-                colorsb.put((float) Spaceship.getCurrentHeading(s, now));
+                colorsb.put((float) Spaceship.getCurrentHeading(s, extrapolationTime));
 
                 // put the shotLength (0 for ship that's not firing)
                 colorsb.put(now - s.get($timeFired) < SHOOT_DURATION ? (float) s.get($shotLength) : 0f);
