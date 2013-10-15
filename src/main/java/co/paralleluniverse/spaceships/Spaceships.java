@@ -198,8 +198,6 @@ public class Spaceships {
         Thread.sleep(5000); // wait for things to optimize a bit.
         port = new GLPort(toolkit, N + 20, Spaceships.this, bounds);
 
-//        LocalActorUtil.join(sup);
-//        System.exit(1);
 
         if (timeStream != null)
             timeStream.println("# time, millis, millis1, millis0");
