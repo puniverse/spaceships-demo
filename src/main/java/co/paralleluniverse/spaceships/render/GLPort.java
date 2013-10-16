@@ -162,7 +162,6 @@ public class GLPort implements GLEventListener {
             drawable = glCanvas;
         }
 
-        drawable.addGLEventListener(this);
         animator = new FPSAnimator(drawable, 30);
 
         if (TOOLKIT == Toolkit.NEWT) {
@@ -208,6 +207,7 @@ public class GLPort implements GLEventListener {
             this.window = window;
         }
 
+        drawable.addGLEventListener(this);
         animator.start();
     }
 
@@ -416,35 +416,29 @@ public class GLPort implements GLEventListener {
                 && y >= port.min(Y) && y <= port.max(Y);
     }
 
-    private void movePort(boolean horizontal, double units) {
+    private void movePort(double horizontal, double vertical) {
         //pmv.glMatrixMode(GLMatrixFunc.GL_MODELVIEW);
         final long ct = System.currentTimeMillis();
         fixPort(ct, false);
 
-        final double width = port.max(X) - port.min(X);
-        final double height = port.max(Y) - port.min(Y);
+//        final double width = port.max(X) - port.min(X);
+//        final double height = port.max(Y) - port.min(Y);
 
-        double moveStep = units * KEY_PRESS_TRANSLATE;
+        double moveStepH = horizontal * KEY_PRESS_TRANSLATE;
+        if (port.min(X) + portMinXAnimation + moveStepH < bounds.min(X))
+            moveStepH = bounds.min(X) - port.min(X);
+        else if (port.max(X) + portMaxXAnimation + moveStepH > bounds.max(X))
+            moveStepH = bounds.max(X) - port.max(X);
+        portMinXAnimation += moveStepH;
+        portMaxXAnimation += moveStepH;
 
-        if (horizontal) {
-            int dim = X;
-            if (port.min(dim) + portMinXAnimation + moveStep < bounds.min(dim)) {
-                moveStep = bounds.min(dim) - port.min(dim);
-            } else if (port.max(dim) + portMaxXAnimation + moveStep > bounds.max(dim)) {
-                moveStep = bounds.max(dim) - port.max(dim);
-            }
-            portMinXAnimation += moveStep;
-            portMaxXAnimation += moveStep;
-        } else {
-            int dim = Y;
-            if (port.min(dim) + portMinYAnimation + moveStep < bounds.min(dim)) {
-                moveStep = bounds.min(dim) - port.min(dim);
-            } else if (port.max(dim) + portMaxYAnimation + moveStep > bounds.max(dim)) {
-                moveStep = bounds.max(dim) - port.max(dim);
-            }
-            portMinYAnimation += moveStep;
-            portMaxYAnimation += moveStep;
-        }
+        double moveStepV = vertical * KEY_PRESS_TRANSLATE;
+        if (port.min(Y) + portMinYAnimation + moveStepV < bounds.min(Y))
+            moveStepV = bounds.min(Y) - port.min(Y);
+        else if (port.max(Y) + portMaxYAnimation + moveStepV > bounds.max(Y))
+            moveStepV = bounds.max(Y) - port.max(Y);
+        portMinYAnimation += moveStepV;
+        portMaxYAnimation += moveStepV;
     }
 
     private void scalePort(double units) {
@@ -513,16 +507,16 @@ public class GLPort implements GLEventListener {
     public void myKeyPressed(int keyCode) {
         switch (keyCode) {
             case com.jogamp.newt.event.KeyEvent.VK_UP:
-                movePort(false, 5);
+                movePort(0, 5);
                 break;
             case com.jogamp.newt.event.KeyEvent.VK_DOWN:
-                movePort(false, -5);
+                movePort(0, -5);
                 break;
             case com.jogamp.newt.event.KeyEvent.VK_LEFT:
-                movePort(true, -5);
+                movePort(-5, 0);
                 break;
             case com.jogamp.newt.event.KeyEvent.VK_RIGHT:
-                movePort(true, 5);
+                movePort(5, 0);
                 break;
             case com.jogamp.newt.event.KeyEvent.VK_EQUALS:
                 scalePort(-1); // reduce port
@@ -530,14 +524,6 @@ public class GLPort implements GLEventListener {
             case com.jogamp.newt.event.KeyEvent.VK_MINUS:
                 scalePort(+1); //extend port
                 break;
-        }
-    }
-
-    public void myMouseWheelMoved(boolean idControlDown, float wheelRotation, boolean isShiftDown) {
-        if (idControlDown) {
-            scalePort((int) Math.signum(wheelRotation));
-        } else {
-            movePort(isShiftDown, -1 * (isShiftDown ? 1 : -1) * wheelRotation);
         }
     }
 
@@ -553,7 +539,12 @@ public class GLPort implements GLEventListener {
             final boolean idControlDown = e.isControlDown();
             final boolean isShiftDown = e.isShiftDown();
             final float wheelRotation = e.getWheelRotation();
-            myMouseWheelMoved(idControlDown, wheelRotation, isShiftDown);
+            if (idControlDown)
+                scalePort((int) Math.signum(wheelRotation));
+            else {
+                double units = -1 * wheelRotation;
+                movePort(isShiftDown ? units : 0, isShiftDown ? 0 : units);
+            }
         }
 
         @Override
@@ -603,17 +594,17 @@ public class GLPort implements GLEventListener {
         @Override
         public void mouseWheelMoved(com.jogamp.newt.event.MouseEvent e) {
             final boolean idControlDown = e.isControlDown();
-            final boolean isShiftDown = e.isShiftDown();
-            final float wheelRotation = e.getWheelRotation();
-            myMouseWheelMoved(idControlDown, wheelRotation, isShiftDown);
+            //final boolean isShiftDown = e.isShiftDown();
+            final float[] wheelRotation = e.getRotation();
+            final float scale = e.getRotationScale() * 0.3f;
+            if (idControlDown)
+                scalePort((int) Math.signum(wheelRotation[1] * scale));
+            else
+                movePort(-wheelRotation[0] * scale, wheelRotation[1] * scale);
         }
 
         @Override
         public void keyReleased(com.jogamp.newt.event.KeyEvent e) {
-        }
-
-        @Override
-        public void keyTyped(com.jogamp.newt.event.KeyEvent e) {
         }
 
         @Override

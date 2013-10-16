@@ -76,7 +76,7 @@ public class VAO {
         else if (vbo.getBuffer() instanceof IntBuffer)
             gl.glVertexAttribIPointer(location, vbo.getComponents(), vbo.getComponentType(), vbo.getStride(), 0);
         else if (vbo.getBuffer() instanceof DoubleBuffer)
-            gl.glVertexAttribLPointer(location, vbo.getComponents(), vbo.getComponentType(), vbo.getStride(), 0);
+            gl.glVertexAttribPointer(location, vbo.getComponents(), vbo.getComponentType(), false, vbo.getStride(), 0);
         else
             throw new GLException("Unrecognized buffer type: " + vbo.getBuffer().getClass().getName());
     }
