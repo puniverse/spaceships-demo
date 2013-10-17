@@ -74,7 +74,7 @@ tasks.withType(JavaExec) {
     // jvmArgs '-XX:+UseG1GC', '-XX:MaxGCPauseMillis=50'
     
     // profiling
-    jvmArgs '-XX:+UnlockCommercialFeatures', '-XX:+FlightRecorder'
+    // jvmArgs '-XX:+UnlockCommercialFeatures', '-XX:+FlightRecorder'
     // jvmArgs '-verbose:gc'
     // jvmArgs '-XX:+UnlockDiagnosticVMOptions', '-XX:+TraceClassLoading', '-XX:+LogCompilation' // use with jitwatch
     // jvmArgs '-XX:+UnlockDiagnosticVMOptions', '-XX:+PrintInlining'
