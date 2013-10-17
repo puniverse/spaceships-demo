@@ -69,6 +69,8 @@ tasks.withType(JavaExec) {
 
     // memory
     jvmArgs '-Xmx1024m'
+    jvmArgs '-XX:+UseParallelGC'
+    jvmArgs '-XX:+UseCondCardMark'
     // jvmArgs '-XX:+UseG1GC', '-XX:MaxGCPauseMillis=50'
     
     // profiling
