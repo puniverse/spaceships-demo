@@ -22,6 +22,7 @@ package co.paralleluniverse.spaceships;
 import co.paralleluniverse.actors.ActorSpec;
 import co.paralleluniverse.actors.behaviors.Supervisor;
 import co.paralleluniverse.actors.behaviors.SupervisorActor;
+import co.paralleluniverse.common.monitoring.Counter;
 import co.paralleluniverse.common.monitoring.Metrics;
 import co.paralleluniverse.common.monitoring.MonitorType;
 import co.paralleluniverse.data.record.Record;
@@ -38,7 +39,6 @@ import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.util.Properties;
 import java.util.concurrent.TimeUnit;
-import jsr166e.LongAdder;
 
 public class Spaceships {
     public static Spaceships spaceships;
@@ -60,7 +60,6 @@ public class Spaceships {
         System.out.println("Initializing...");
         spaceships = new Spaceships(props);
 
-
         System.out.println("Running...");
         spaceships.run();
 
@@ -81,12 +80,14 @@ public class Spaceships {
     private File metricsDir;
     private PrintStream configStream;
     private PrintStream timeStream;
-    final LongAdder spaceshipsCycles = new LongAdder();
+    final Counter spaceshipsCycles = new Counter();
     //
     private long cycleStart;
 
     public Spaceships(Properties props) throws Exception {
-        final int parallelism = DefaultFiberScheduler.getInstance().getFjPool().getParallelism();// Integer.parseInt(props.getProperty("parallelism", "2"));
+        if (props.getProperty("parallelism") != null)
+            System.setProperty("co.paralleluniverse.fibers.DefaultFiberPool.parallelism", props.getProperty("parallelism"));
+        final int parallelism = ((FiberForkJoinScheduler) DefaultFiberScheduler.getInstance()).getForkJoinPool().getParallelism();// Integer.parseInt(props.getProperty("parallelism", "2"));
         double b = Double.parseDouble(props.getProperty("world-length", "20000"));
         this.bounds = AABB.create(-b / 2, b / 2, -b / 2 * 0.7, b / 2 * 0.7, -b / 2, b / 2);
         this.N = Integer.parseInt(props.getProperty("N", "10000"));
@@ -95,7 +96,7 @@ public class Spaceships {
         this.extrapolate = Boolean.parseBoolean(props.getProperty("extrapolate", "true"));
 
         this.phaser = Boolean.parseBoolean(props.getProperty("phaser", "false")) ? new Phaser() : null;
-        
+
         if (props.getProperty("dir") != null) // collect performance metrics in csv files
             createMetricsFiles(props);
 
@@ -105,7 +106,7 @@ public class Spaceships {
         println("Phaser: " + (phaser != null));
         println("Extrapolate: " + extrapolate);
         println();
-        
+
         this.random = new RandSpatial();
 
         this.sb = initSpaceBase(props);
@@ -198,7 +199,6 @@ public class Spaceships {
         Thread.sleep(5000); // wait for things to optimize a bit.
         port = new GLPort(toolkit, N + 20, Spaceships.this, bounds);
 
-
         if (timeStream != null)
             timeStream.println("# time, millis, millis1, millis0");
 
@@ -206,7 +206,7 @@ public class Spaceships {
             long prevTime = System.nanoTime();
             for (int k = 0;; k++) {
                 Thread.sleep(1000);
-                long cycles = spaceshipsCycles.sumThenReset();
+                long cycles = spaceshipsCycles.getAndReset();
                 long now = System.nanoTime();
 
                 double seconds = (double) (now - prevTime) * 1e-9;

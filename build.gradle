@@ -3,20 +3,20 @@ apply plugin: 'application'
 sourceCompatibility = '1.7'
 [compileJava, compileTestJava]*.options*.encoding = 'UTF-8'
 
-version = "2.0-SNAPSHOT"
+version = "2.1-SNAPSHOT"
 
 mainClassName = 'co.paralleluniverse.spaceships.Spaceships'
 ext.mainClass = mainClassName
 
 repositories {
     flatDir { dirs 'baselib' }
-    //    repositories {
-    //        mavenCentral()
-    //        mavenLocal()
-    //        maven { url "https://oss.sonatype.org/content/repositories/releases" }
-    //        maven { url "https://oss.sonatype.org/content/repositories/snapshots" }
-    //        maven { url "http://download.oracle.com/maven/" }
-    //    }
+//    repositories {
+//        mavenCentral()
+//        mavenLocal()
+//        maven { url "https://oss.sonatype.org/content/repositories/releases" }
+//        maven { url "https://oss.sonatype.org/content/repositories/snapshots" }
+//        maven { url "http://download.oracle.com/maven/" }
+//    }
 }
 
 configurations {
@@ -24,31 +24,41 @@ configurations {
 }
     
 dependencies {
-    compile "co.paralleluniverse:spacebase-core:2.0"
-    compile "co.paralleluniverse:quasar-core:0.3.0"
-    compile "co.paralleluniverse:quasar-actors:0.3.0"
-    compile "com.google.guava:guava:15.0"
-    compile "com.codahale.metrics:metrics-core:3.0.1" 
+    compile "co.paralleluniverse:spacebase-core:2.2"
+    // compile "co.paralleluniverse:spacebase-core:2.2:jdk8" // JDK 8
+    compile "co.paralleluniverse:quasar-core:0.5.0"
+    // compile "co.paralleluniverse:quasar-core:0.5.0:jdk8" // JDK 8
+    
+    compile "co.paralleluniverse:quasar-actors:0.5.0"
+    compile "com.google.guava:guava:16.0.1"
+    compile "com.codahale.metrics:metrics-core:3.0.2" 
+    compile "org.jogamp.jogl:jogl-all:2.1.0"
+    compile 'org.apache.commons:commons-lang3:3.1'
+    
     compile "org.jogamp.jogl:jogl-all:2.1.0"
     compile "org.jogamp.gluegen:gluegen-rt:2.1.0"
+
     runtime "org.jogamp.jogl:jogl-all:2.1.0:natives-linux-i586", "org.jogamp.jogl:jogl-all:2.1.0:natives-linux-amd64", 
             "org.jogamp.jogl:jogl-all:2.1.0:natives-windows-i586", "org.jogamp.jogl:jogl-all:2.1.0:natives-windows-amd64", 
             "org.jogamp.jogl:jogl-all:2.1.0:natives-macosx-universal"
+
     runtime "org.jogamp.gluegen:gluegen-rt:2.1.0:natives-linux-i586", "org.jogamp.gluegen:gluegen-rt:2.1.0:natives-linux-amd64", 
             "org.jogamp.gluegen:gluegen-rt:2.1.0:natives-windows-i586", "org.jogamp.gluegen:gluegen-rt:2.1.0:natives-windows-amd64", 
-            "org.jogamp.gluegen:gluegen-rt:2.1.0:natives-macosx-universal"
-    runtime "net.sf.trove4j:trove4j:3.0.2"        
+            "org.jogamp.gluegen:gluegen-rt:2.1.0:natives-macosx-universal"    
+    
+    runtime "net.sf.trove4j:trove4j:3.0.3"        
 
-    quasar  "co.paralleluniverse:quasar-core:0.3.0"
+    quasar  "co.paralleluniverse:quasar-core:0.5.0"
+    // quasar  "co.paralleluniverse:quasar-core:0.5.0:jdk8" // JDK 8
     
     // we need the following only because the jars are in baselib, and gradle doesn't knwo about their transitive dependencies
-    runtime "org.ow2.asm:asm:4.1", "org.ow2.asm:asm-commons:4.1", "org.ow2.asm:asm-util:4.1", "org.ow2.asm:asm-tree:4.1", "org.ow2.asm:asm-analysis:4.1"
-    runtime "org.slf4j:slf4j-api:1.7.5"
-    runtime "org.apache.logging.log4j:log4j-slf4j-impl:2.0-beta9", "org.apache.logging.log4j:log4j-api:2.0-beta9", "org.apache.logging.log4j:log4j-core:2.0-beta9"
-    runtime "com.lmax:disruptor:3.2.0" // required for log4j
+    runtime "org.ow2.asm:asm:5.0_BETA", "org.ow2.asm:asm-commons:5.0_BETA", "org.ow2.asm:asm-util:5.0_BETA", "org.ow2.asm:asm-tree:5.0_BETA", "org.ow2.asm:asm-analysis:5.0_BETA"
+    runtime "org.slf4j:slf4j-api:1.7.6"
+    runtime "org.apache.logging.log4j:log4j-slf4j-impl:2.0-rc1", "org.apache.logging.log4j:log4j-api:2.0-rc1", "org.apache.logging.log4j:log4j-core:2.0-rc1"
+    runtime "com.lmax:disruptor:3.2.1" // required for log4j
 }
 
-task copyLibs(type: Copy) {
+task copyLibs(type: Sync) {
     from { configurations.runtime }
     into { "${rootProject.projectDir}/baselib" }
     //    include 'gluegen-*.jar'
@@ -60,6 +70,7 @@ task copyShaders(type:Copy) {
     into 'build/classes/main/co/paralleluniverse/spaceships/render/shader'
 }
 classes.dependsOn copyShaders
+//classes.dependsOn copyLibs
 
 tasks.withType(JavaExec) {
     jvmArgs '-server'
@@ -89,11 +100,12 @@ tasks.withType(JavaExec) {
     // systemProperty "co.paralleluniverse.debugMode", "true"
     systemProperty "co.paralleluniverse.globalFlightRecorder", "true"
     systemProperty "co.paralleluniverse.flightRecorderDumpFile", "spaceships.log"
+    systemProperty "co.paralleluniverse.monitoring.flightRecorderLevel", "1"
     systemProperty "co.paralleluniverse.monitoring.flightRecorderSize","100000" 
 }
 
 task wrapper(type: Wrapper) {
-    gradleVersion = '1.8'
+    gradleVersion = '1.11'
 }
 
 task classpath << {

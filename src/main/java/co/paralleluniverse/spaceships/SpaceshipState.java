@@ -20,7 +20,9 @@
 package co.paralleluniverse.spaceships;
 
 import co.paralleluniverse.actors.ActorRef;
+import co.paralleluniverse.data.record.Field;
 import co.paralleluniverse.data.record.Field.DoubleField;
+import co.paralleluniverse.data.record.Field.IntField;
 import co.paralleluniverse.data.record.Field.LongField;
 import co.paralleluniverse.data.record.Field.ObjectField;
 import co.paralleluniverse.data.record.RecordType;
@@ -32,7 +34,8 @@ import com.google.common.reflect.TypeToken;
  * @author pron
  */
 public final class SpaceshipState {
-    public static final RecordType<SpaceshipState> stateType = new RecordType<>();
+    public static final RecordType<SpaceshipState> stateType = RecordType.newType(SpaceshipState.class);
+    public static final IntField<SpaceshipState> $id = stateType.intField("id");
     public static final LongField<SpaceshipState> $lastMoved = stateType.longField("lastMoved");
     public static final LongField<SpaceshipState> $timeFired = stateType.longField("timeFired");
     public static final LongField<SpaceshipState> $blowTime = stateType.longField("blowTime");
@@ -47,8 +50,8 @@ public final class SpaceshipState {
     public static final DoubleField<SpaceshipState> $exVx = stateType.doubleField("exVx");
     public static final DoubleField<SpaceshipState> $exVy = stateType.doubleField("exVy");
     public static final ObjectField<SpaceshipState, Spaceship.Status> $status = stateType.objectField("status", Spaceship.Status.class);
-    public static final ObjectField<SpaceshipState, SpatialToken> $token = stateType.objectField("token", SpatialToken.class);
-    public static final ObjectField<SpaceshipState, ActorRef<Spaceship.SpaceshipMessage>> $spaceship = stateType.objectField("spaceship", new TypeToken<ActorRef<Spaceship.SpaceshipMessage>>() {});
+    public static final ObjectField<SpaceshipState, SpatialToken> $token = stateType.objectField("token", SpatialToken.class, Field.TRANSIENT);
+    public static final ObjectField<SpaceshipState, ActorRef<Spaceship.SpaceshipMessage>> $spaceship = stateType.objectField("spaceship", new TypeToken<ActorRef<Spaceship.SpaceshipMessage>>() {}, Field.TRANSIENT);
 
     private SpaceshipState() {
     }

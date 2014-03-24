@@ -19,6 +19,7 @@
  */
 package co.paralleluniverse.spaceships;
 
+import co.paralleluniverse.db.tree.QueryResult;
 import co.paralleluniverse.spacebase.AABB;
 import co.paralleluniverse.spacebase.SpatialQuery;
 
@@ -52,10 +53,10 @@ class LineDistanceQuery<T> implements SpatialQuery<T> {
     }
 
     @Override
-    public SpatialQuery.Result queryContainer(AABB aabb) {
+    public QueryResult queryContainer(AABB aabb) {
         if (lineAABB.contains(aabb) || lineAABB.intersects(aabb))
-            return SpatialQuery.Result.SOME;
-        return SpatialQuery.Result.NONE;
+            return QueryResult.SOME;
+        return QueryResult.NONE;
     }
 
     @Override

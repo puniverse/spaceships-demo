@@ -19,6 +19,7 @@
  */
 package co.paralleluniverse.spaceships;
 
+import co.paralleluniverse.db.tree.QueryResult;
 import co.paralleluniverse.spacebase.AABB;
 import co.paralleluniverse.spacebase.SpatialQuery;
 
@@ -55,17 +56,15 @@ public class RadarQuery implements SpatialQuery<Object> {
     }
 
     @Override
-    public Result queryContainer(AABB aabb) {
+    public QueryResult queryContainer(AABB aabb) {
         if (this.aabb.contains(aabb) || this.aabb.intersects(aabb))
-            return SpatialQuery.Result.SOME;
-        return SpatialQuery.Result.NONE;
+            return QueryResult.SOME;
+        return QueryResult.NONE;
     }
 
     @Override
     public boolean queryElement(AABB aabb, Object elem) {
         double ang = Math.atan2(aabb.max(1) - y, aabb.max(0) - x);
-        if (Math.abs(ang - heading) < dev)
-            return true;
-        return false;
+        return Math.abs(ang - heading) < dev;
     }
 }

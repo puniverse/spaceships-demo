@@ -315,18 +315,19 @@ public class GLPort implements GLEventListener {
             final FloatBuffer verticesb = (FloatBuffer) vertices.getBuffer();
             final FloatBuffer colorsb = (FloatBuffer) colors.getBuffer();
             long now = global.now();
-            fixPort(now, true);
-            MutableAABB currentPort = getCurrentPort(now);
+            long clock = System.currentTimeMillis();
+            fixPort(clock, true);
+            MutableAABB currentPort = getCurrentPort(clock);
             portToMvMatrix(currentPort);
             double margins = WIDTH_MARGINS;
 
             final int n;
-            if (now - lastQueryTime > SB_QUERY_RATE) {
+            if (clock - lastQueryTime > SB_QUERY_RATE) {
                 n = query(now, SpatialQueries.contained(AABB.create(currentPort.min(X) - margins, currentPort.max(X) + margins, currentPort.min(Y) - margins, currentPort.max(Y) + margins)));
-                lastQueryTime = now;
+                lastQueryTime = clock;
             } else {
                 n = indexGen.get();
-                lastDispTime = now;
+                lastDispTime = clock;
             }
 
             int countInPort = 0;
@@ -472,7 +473,7 @@ public class GLPort implements GLEventListener {
     }
 
     private MutableAABB getCurrentPort(final long ct) {
-        if (portMaxXAnimation == 0)
+        if (portMaxXAnimation == 0 & portMaxYAnimation == 0)
             return port;
         MutableAABB currentPort = MutableAABB.create(2);
         final double width = port.max(X) - port.min(X);
