@@ -104,6 +104,7 @@ public class GLPort implements GLEventListener {
     private final int maxItems;
     private final SpaceBase<Record<SpaceshipState>> sb;
     private final AABB bounds;
+    private final int glxNode;
     private MutableAABB port = MutableAABB.create(2);
     private ProgramState shaderState;
     private VAO vao;
@@ -121,12 +122,13 @@ public class GLPort implements GLEventListener {
         GLProfile.initSingleton();
     }
 
-    public GLPort(Toolkit toolkit, int maxItems, Spaceships global, AABB bounds) {
+    public GLPort(Toolkit toolkit, int maxItems, Spaceships global, AABB bounds, int glxNode) {
         TOOLKIT = toolkit;
         this.maxItems = maxItems;
         this.global = global;
         this.sb = global.getPlainSpaceBase();
         this.bounds = bounds;
+        this.glxNode = glxNode;
 
         this.ships = SpaceshipState.stateType.newArray(maxItems);
 
@@ -347,7 +349,9 @@ public class GLPort implements GLEventListener {
                 if (portContains(s.get($x), s.get($y)))
                     countInPort++;
             }
-            setTitle("" + countInPort + " Spaceships " + (int) (port.max(X) - port.min(X)) + "x" + (int) (port.max(Y) - port.min(Y)));
+            setTitle((glxNode >= 0 ? "Node " + glxNode + ": " : "")
+                    + countInPort + " Spaceships "
+                    + (int) (port.max(X) - port.min(X)) + "x" + (int) (port.max(Y) - port.min(Y)));
 
             vertices.flip();
             colors.flip();

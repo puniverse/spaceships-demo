@@ -23,15 +23,19 @@ import co.paralleluniverse.actors.ActorSpec;
 import co.paralleluniverse.actors.behaviors.Supervisor;
 import co.paralleluniverse.actors.behaviors.SupervisorActor;
 import co.paralleluniverse.common.monitoring.Counter;
+import co.paralleluniverse.common.monitoring.CpuUsageGaugeSet;
 import co.paralleluniverse.common.monitoring.Metrics;
 import co.paralleluniverse.common.monitoring.MonitorType;
 import co.paralleluniverse.data.record.Record;
+import co.paralleluniverse.db.store.galaxy.GalaxyStore;
 import co.paralleluniverse.fibers.*;
+import co.paralleluniverse.galaxy.Grid;
 import co.paralleluniverse.spacebase.AABB;
 import co.paralleluniverse.spacebase.quasar.SpaceBase;
 import co.paralleluniverse.spacebase.quasar.SpaceBaseBuilder;
 import co.paralleluniverse.spaceships.render.GLPort;
 import co.paralleluniverse.strands.concurrent.Phaser;
+import com.codahale.metrics.jvm.MemoryUsageGaugeSet;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -57,8 +61,27 @@ public class Spaceships {
         Properties props = new Properties();
         props.load(new InputStreamReader(ClassLoader.getSystemResourceAsStream("spaceships.properties")));
 
+//        Metrics.register("cpu", new CpuUsageGaugeSet());
+//        Metrics.register("memory", new MemoryUsageGaugeSet());
+        int glxNode = args.length > 0 ? Integer.parseInt(args[0]) : -1;
+        if (glxNode < 0)
+            glxNode = Integer.parseInt(props.getProperty("galaxy.nodeId", "-1"));
+
+        if (glxNode >= 0) {
+            if (glxNode == 0)
+                throw new IllegalArgumentException("Node cannot be 0. Reserved for Galaxy server.");
+            System.out.println("Connecting to Galaxy cluster...");
+
+            System.setProperty("co.paralleluniverse.flightRecorderDumpFile", "spaceships-" + glxNode + ".log");
+
+            System.setProperty("galaxy.nodeId", Integer.toString(glxNode));
+            System.setProperty("galaxy.port", props.getProperty("galaxy.port", Integer.toString(7050 + glxNode)));
+            System.setProperty("galaxy.slave_port", props.getProperty("galaxy.port", Integer.toString(8050 + glxNode)));
+            Grid.getInstance();
+        }
+
         System.out.println("Initializing...");
-        spaceships = new Spaceships(props);
+        spaceships = new Spaceships(glxNode, props);
 
         System.out.println("Running...");
         spaceships.run();
@@ -66,6 +89,7 @@ public class Spaceships {
         Thread.sleep(100000);
     }
     //
+    private final int glxNode;
     private final GLPort.Toolkit toolkit;
     public final SpaceBase<Record<SpaceshipState>> sb;
     private GLPort port = null;
@@ -84,12 +108,42 @@ public class Spaceships {
     //
     private long cycleStart;
 
-    public Spaceships(Properties props) throws Exception {
+    public Spaceships(int node, Properties props) throws Exception {
         if (props.getProperty("parallelism") != null)
             System.setProperty("co.paralleluniverse.fibers.DefaultFiberPool.parallelism", props.getProperty("parallelism"));
         final int parallelism = ((FiberForkJoinScheduler) DefaultFiberScheduler.getInstance()).getForkJoinPool().getParallelism();// Integer.parseInt(props.getProperty("parallelism", "2"));
-        double b = Double.parseDouble(props.getProperty("world-length", "20000"));
-        this.bounds = AABB.create(-b / 2, b / 2, -b / 2 * 0.7, b / 2 * 0.7, -b / 2, b / 2);
+
+        this.glxNode = node;
+
+        final double b = Double.parseDouble(props.getProperty("world-length", "20000"));
+        if (node < 0) {
+            this.bounds = AABB.create(-b / 2, b / 2, -b / 2 * 0.7, b / 2 * 0.7);
+        } else {
+            final double northSign;
+            final double eastSign;
+            switch (node) {
+                case 1:
+                    northSign = 1.0;
+                    eastSign = 1.0;
+                    break;
+                case 2:
+                    northSign = 1.0;
+                    eastSign = -1.0;
+                    break;
+                case 3:
+                    northSign = -1.0;
+                    eastSign = 1.0;
+                    break;
+                case 4:
+                    northSign = -1.0;
+                    eastSign = -1.0;
+                    break;
+                default:
+                    throw new IllegalArgumentException("Node must be between 1 and 4 (inclusive)"); // arbitrary; so only becuase we divide the world into 4 quadrants
+            }
+            this.bounds = AABB.create(Math.min(0, eastSign * b), Math.max(0, eastSign * b), Math.min(0, northSign * b), Math.max(0, northSign * b));
+        }
+
         this.N = Integer.parseInt(props.getProperty("N", "10000"));
         this.speedVariance = Double.parseDouble(props.getProperty("speed-variance", "1"));
         this.range = Double.parseDouble(props.getProperty("radar-range", "10"));
@@ -100,6 +154,7 @@ public class Spaceships {
         if (props.getProperty("dir") != null) // collect performance metrics in csv files
             createMetricsFiles(props);
 
+        println("Galaxy node: " + (glxNode > 0 ? glxNode : " NOT DISTRIBUTED"));
         println("World bounds: " + bounds);
         println("N: " + N);
         println("Parallelism: " + parallelism);
@@ -159,6 +214,9 @@ public class Spaceships {
 
         SpaceBaseBuilder builder = new SpaceBaseBuilder();
 
+        if (glxNode > 0)
+            builder.setStore(GalaxyStore.class);
+
         builder.setQueueBackpressure(1000);
 
         if (optimistic)
@@ -197,7 +255,7 @@ public class Spaceships {
         }.spawn();
 
         Thread.sleep(5000); // wait for things to optimize a bit.
-        port = new GLPort(toolkit, N + 20, Spaceships.this, bounds);
+        port = new GLPort(toolkit, N + 20, Spaceships.this, bounds, glxNode);
 
         if (timeStream != null)
             timeStream.println("# time, millis, millis1, millis0");

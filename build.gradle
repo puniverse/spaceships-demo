@@ -24,25 +24,29 @@ configurations {
 }
     
 dependencies {
-    compile "co.paralleluniverse:spacebase-core:2.3-SNAPSHOT:jdk8" // JDK 8
-    compile "co.paralleluniverse:quasar-core:0.6.0-SNAPSHOT:jdk8" // JDK 8
-    quasar  "co.paralleluniverse:quasar-core:0.6.0-SNAPSHOT:jdk8@jar" // JDK 8
-    
+    compile "co.paralleluniverse:quasar-core:0.6.0-SNAPSHOT:jdk8"  // JDK 8    
     compile "co.paralleluniverse:quasar-actors:0.6.0-SNAPSHOT"
-    compile "com.google.guava:guava:16.0.1"
-    compile "com.codahale.metrics:metrics-core:3.0.2" 
-    compile "org.jogamp.jogl:jogl-all:2.1.0"
-    compile 'org.apache.commons:commons-lang3:3.1'
+    compile "co.paralleluniverse:quasar-galaxy:0.6.0-SNAPSHOT"
+    compile "co.paralleluniverse:spacebase-core:2.3-SNAPSHOT:jdk8" // JDK 8
+    compile "co.paralleluniverse:spacebase-galaxy:2.3-SNAPSHOT"
+    compile "co.paralleluniverse:galaxy:1.4-SNAPSHOT"
     
-    compile files('jogamp/gluegen-rt-2.1.0.jar')
-    compile files('jogamp/jogl-all-2.1.0.jar')
-    runtime files('jogamp/gluegen-rt-2.1.0-natives-linux-i586.jar', 'jogamp/gluegen-rt-2.1.0-natives-linux-amd64.jar',
-                  'jogamp/gluegen-rt-2.1.0-natives-windows-i586.jar', 'jogamp/gluegen-rt-2.1.0-natives-windows-amd64.jar',
-                  'jogamp/gluegen-rt-2.1.0-natives-macosx-universal.jar')
-    runtime files('jogamp/jogl-all-2.1.0-natives-linux-i586.jar', 'jogamp/jogl-all-2.1.0-natives-linux-amd64.jar',
-                  'jogamp/jogl-all-2.1.0-natives-windows-i586.jar', 'jogamp/jogl-all-2.1.0-natives-windows-amd64.jar',
-                  'jogamp/jogl-all-2.1.0-natives-macosx-universal.jar')
+    quasar  "co.paralleluniverse:quasar-core:0.6.0-SNAPSHOT:jdk8@jar" // JDK 8
 
+    compile "com.google.guava:guava:17.0"
+    compile "com.codahale.metrics:metrics-core:3.0.2" 
+    compile "com.codahale.metrics:metrics-jvm:3.0.2" 
+    compile 'org.apache.commons:commons-lang3:3.1'
+
+    compile ":jogl-all:2.1.0"
+    compile ":gluegen-rt:2.1.0"
+    runtime ":jogl-all:2.1.0:natives-linux-i586", ":jogl-all:2.1.0:natives-linux-amd64", 
+            ":jogl-all:2.1.0:natives-windows-i586", "l:jogl-all:2.1.0:natives-windows-amd64", 
+            ":jogl-all:2.1.0:natives-macosx-universal"
+    runtime ":gluegen-rt:2.1.0:natives-linux-i586", ":gluegen-rt:2.1.0:natives-linux-amd64", 
+            ":gluegen-rt:2.1.0:natives-windows-i586", ":gluegen-rt:2.1.0:natives-windows-amd64", 
+            ":gluegen-rt:2.1.0:natives-macosx-universal" 
+    
     //    natives "org.jogamp.jogl:jogl-all:2.1.0"
     //    natives "org.jogamp.gluegen:gluegen-rt:2.1.0"
     //    natives "org.jogamp.jogl:jogl-all:2.1.0:natives-linux-i586", "org.jogamp.jogl:jogl-all:2.1.0:natives-linux-amd64", 
@@ -68,7 +72,7 @@ task copyJogamp(type: Sync) {
 }
 
 task copyLibs(type: Sync) {
-    dependsOn copyJogamp
+    // dependsOn copyJogamp
     from { configurations.compile }
     into { "${rootProject.projectDir}/lib" }
     include 'spacebase-*.jar'
@@ -82,10 +86,20 @@ classes.dependsOn copyShaders
 
 tasks.withType(JavaExec) {
     jvmArgs '-server'
-    jvmArgs "-javaagent:${configurations.quasar.singleFile}" // =vdmc (verbose, debug, allow monitors, check class)
+        
+    // Quasar
     // systemProperty "co.paralleluniverse.fibers.DefaultFiberPool.parallelism", "4"
     systemProperty "co.paralleluniverse.fibers.DefaultFiberPool.monitor", "JMX" // "METRICS" // "NONE" //
-
+    jvmArgs "-javaagent:${configurations.quasar.singleFile}" // =vdmc (verbose, debug, allow monitors, check class)
+    
+    // Galaxy
+    systemProperty "co.paralleluniverse.io.useJDKSerialization", "true"
+    systemProperty "jgroups.bind_addr", "127.0.0.1"
+    systemProperty "galaxy.multicast.address", "225.0.0.1"
+    systemProperty "galaxy.multicast.port", "7050"
+    systemProperty "co.paralleluniverse.galaxy.configFile", "build/resources/main/config/peer.xml"
+    systemProperty "co.paralleluniverse.galaxy.autoGoOnline", "true"
+    
     // memory
     jvmArgs '-Xmx1024m'
     jvmArgs '-XX:+UseParallelGC'
