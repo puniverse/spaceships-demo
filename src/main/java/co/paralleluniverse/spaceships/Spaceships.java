@@ -19,6 +19,7 @@
  */
 package co.paralleluniverse.spaceships;
 
+import co.paralleluniverse.actors.Actor;
 import co.paralleluniverse.actors.ActorSpec;
 import co.paralleluniverse.actors.behaviors.Supervisor;
 import co.paralleluniverse.actors.behaviors.SupervisorActor;
@@ -28,11 +29,13 @@ import co.paralleluniverse.common.monitoring.Metrics;
 import co.paralleluniverse.common.monitoring.MonitorType;
 import co.paralleluniverse.data.record.Record;
 import co.paralleluniverse.db.store.galaxy.GalaxyStore;
+import co.paralleluniverse.db.store.galaxy.MigrationListener;
 import co.paralleluniverse.fibers.*;
 import co.paralleluniverse.galaxy.Grid;
 import co.paralleluniverse.spacebase.AABB;
 import co.paralleluniverse.spacebase.quasar.SpaceBase;
 import co.paralleluniverse.spacebase.quasar.SpaceBaseBuilder;
+import static co.paralleluniverse.spaceships.SpaceshipState.$spaceship;
 import co.paralleluniverse.spaceships.render.GLPort;
 import co.paralleluniverse.strands.concurrent.Phaser;
 import com.codahale.metrics.jvm.MemoryUsageGaugeSet;
@@ -239,6 +242,31 @@ public class Spaceships {
         }
 
         final SpaceBase<Record<SpaceshipState>> space = builder.build("base1");
+
+        if (glxNode > 0) {
+            GalaxyStore store = (GalaxyStore) space.getStore();
+//            store.addMigrationListener(new MigrationListener<Record<SpaceshipState>>() {
+//
+//                @Override
+//                public void immigrating(Record<SpaceshipState> record) {
+//                    try {
+//                        Actor.hire(record.get($spaceship));
+//                    } catch (SuspendExecution e) {
+//                        throw new AssertionError(e);
+//                    }
+//                }
+//
+//                @Override
+//                public void emigrating(Record<SpaceshipState> record) {
+//                    try {
+//                        Actor.xxx(record.get($spaceship));
+//                    } catch (SuspendExecution e) {
+//                        throw new AssertionError(e);
+//                    }
+//                }
+//            });
+        }
+
         return space;
     }
 
