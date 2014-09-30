@@ -232,12 +232,12 @@ public class GLPort implements GLEventListener {
             throw new RuntimeException(ex);
         }
 
-        drawableWidth = drawable.getWidth();
-        drawableHeight = drawable.getHeight();
-        port.min(X, -drawable.getWidth() / 2);
-        port.max(X, drawable.getWidth() / 2);
-        port.min(Y, -drawable.getHeight() / 2);
-        port.max(Y, drawable.getHeight() / 2);
+        drawableWidth = drawable.getSurfaceWidth();
+        drawableHeight = drawable.getSurfaceHeight();
+        port.min(X, -drawable.getSurfaceWidth() / 2);
+        port.max(X, drawable.getSurfaceWidth() / 2);
+        port.min(Y, -drawable.getSurfaceHeight() / 2);
+        port.max(Y, drawable.getSurfaceHeight() / 2);
         //gl.glEnable(gl.GL_VERTEX_PROGRAM_POINT_SIZE);
         gl.glViewport(0, 0, (int) (port.max(X) - port.min(X)), (int) (port.max(Y) - port.min(Y)));
         gl.glClearColor(0, 0, 0, 1);
