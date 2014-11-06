@@ -3,7 +3,6 @@
 /nbproject/private/
 build/
 .DS_Store
-
 .gradle/
 /.nb-gradle/profiles/private/
 /.nb-gradle/private/
