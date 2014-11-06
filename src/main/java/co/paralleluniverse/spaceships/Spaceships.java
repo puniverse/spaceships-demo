@@ -64,8 +64,9 @@ public class Spaceships {
         Properties props = new Properties();
         props.load(new InputStreamReader(ClassLoader.getSystemResourceAsStream("spaceships.properties")));
 
-//        Metrics.register("cpu", new CpuUsageGaugeSet());
-//        Metrics.register("memory", new MemoryUsageGaugeSet());
+        Metrics.register("cpu", new CpuUsageGaugeSet());
+        Metrics.register("memory", new MemoryUsageGaugeSet());
+        
         int glxNode = args.length > 0 ? Integer.parseInt(args[0]) : -1;
         if (glxNode < 0)
             glxNode = Integer.parseInt(props.getProperty("galaxy.nodeId", "-1"));
@@ -245,26 +246,23 @@ public class Spaceships {
 
         if (glxNode > 0) {
             GalaxyStore store = (GalaxyStore) space.getStore();
-//            store.addMigrationListener(new MigrationListener<Record<SpaceshipState>>() {
-//
-//                @Override
-//                public void immigrating(Record<SpaceshipState> record) {
-//                    try {
-//                        Actor.hire(record.get($spaceship));
-//                    } catch (SuspendExecution e) {
-//                        throw new AssertionError(e);
-//                    }
-//                }
-//
-//                @Override
-//                public void emigrating(Record<SpaceshipState> record) {
-//                    try {
-//                        Actor.xxx(record.get($spaceship));
-//                    } catch (SuspendExecution e) {
-//                        throw new AssertionError(e);
-//                    }
-//                }
-//            });
+            
+            store.addMigrationListener(new MigrationListener<Record<SpaceshipState>>() {
+
+                @Override
+                public void immigrating(Record<SpaceshipState> record) {
+                    try {
+                        Actor.hire(record.get($spaceship));
+                    } catch (SuspendExecution e) {
+                        throw new AssertionError(e);
+                    }
+                }
+
+                @Override
+                public void emigrating(Record<SpaceshipState> record) {
+                    System.out.println("Spaceship leaving: " + record);
+                }
+            });
         }
 
         return space;
@@ -288,15 +286,15 @@ public class Spaceships {
         if (timeStream != null)
             timeStream.println("# time, millis, millis1, millis0");
 
-        if (true || phaser == null) {
+        if (phaser == null) {
             long prevTime = System.nanoTime();
             for (int k = 0;; k++) {
                 Thread.sleep(1000);
                 long cycles = spaceshipsCycles.getAndReset();
                 long now = System.nanoTime();
 
-                double seconds = (double) (now - prevTime) * 1e-9;
-                double frames = (double) cycles / (double) N;
+                double seconds = (now - prevTime) * 1e-9;
+                double frames = cycles / (double) N;
 
                 double fps = frames / seconds;
                 System.out.println(k + "\tRATE: " + fps + " fps");

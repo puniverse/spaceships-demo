@@ -126,6 +126,7 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
             state.set($spaceship, ref());
             state.set($token, global.sb.insert(new TransactionalRecord<>(this, state), getAABB()));
             this.state = new StrandedTransactionalRecord<>(state, true, global.sb); // protect state
+            global.sb.setMigrationWatchOn(state.get($token), token -> migrate());
 
             record(1, "Spaceship", "doRun", "%s", this);
             for (int i = 0;; i++) {
