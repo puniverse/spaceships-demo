@@ -86,6 +86,16 @@ task copyShaders(type:Copy) {
 }
 classes.dependsOn copyShaders
 
+run {
+    classpath = sourceSets.main.runtimeClasspath
+    if(project.hasProperty('args')){
+        args project.args.split('\\s+')
+    }
+    if(project.hasProperty('mainClass')){
+        main = project.mainClass
+    }
+}
+
 tasks.withType(JavaExec) {
     jvmArgs '-server'
         
