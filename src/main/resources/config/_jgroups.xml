@@ -29,7 +29,6 @@
                         ucast_send_buf_size="640K"
                         mcast_recv_buf_size="25M"
                         mcast_send_buf_size="640K"
-                        loopback="true"
                         max_bundle_size="64K"
                         max_bundle_timeout="30"
                         ip_ttl="${jgroups.udp.ip_ttl:8}"
@@ -42,8 +41,7 @@
                         timer.keep_alive_time="3000"
                         timer.queue_max_size="500"/>
 
-                    <PING timeout="2000"
-                          num_initial_members="4"/>
+                    <PING timeout="2000"/>
                     <MERGE3 max_interval="30000"
                             min_interval="10000"/>
                     <FD_SOCK/>

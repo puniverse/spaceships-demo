@@ -35,7 +35,7 @@ dependencies {
     
     quasar  "co.paralleluniverse:quasar-core:0.6.2-SNAPSHOT:jdk8@jar" // JDK 8
 
-    compile "com.google.guava:guava:17.0"
+    compile "com.google.guava:guava:18.0"
     compile "com.codahale.metrics:metrics-core:3.0.2" 
     compile "com.codahale.metrics:metrics-jvm:3.0.2" 
     compile 'org.apache.commons:commons-lang3:3.1'
@@ -98,15 +98,16 @@ run {
 
 tasks.withType(JavaExec) {
     jvmArgs '-server'
-        
+    
     // Quasar
     // systemProperty "co.paralleluniverse.fibers.DefaultFiberPool.parallelism", "4"
     systemProperty "co.paralleluniverse.fibers.DefaultFiberPool.monitor", "JMX" // "METRICS" // "NONE" //
     jvmArgs "-javaagent:${configurations.quasar.singleFile}" // =vdmc (verbose, debug, allow monitors, check class)
     
     // Galaxy
+    systemProperty 'java.net.preferIPv4Stack', 'true'
+    // systemProperty "jgroups.bind_addr", "127.0.0.1"
     systemProperty "co.paralleluniverse.io.useJDKSerialization", "true"
-    systemProperty "jgroups.bind_addr", "127.0.0.1"
     systemProperty "galaxy.multicast.address", "225.0.0.1"
     systemProperty "galaxy.multicast.port", "7050"
     systemProperty "co.paralleluniverse.galaxy.configFile", "build/resources/main/config/peer.xml"
