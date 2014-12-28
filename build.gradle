@@ -8,6 +8,9 @@ version = "2.1-SNAPSHOT"
 mainClassName = 'co.paralleluniverse.spaceships.Spaceships'
 ext.mainClass = mainClassName
 
+ext.quasarVer = '0.6.3-SNAPSHOT'
+ext.spacebaseVer = '2.3-SNAPSHOT'
+ext.galaxyVer = '1.4.1-SNAPSHOT'
 ext.jogampVer   = '2.2.1'
 
 repositories {
@@ -26,14 +29,14 @@ configurations {
 }
     
 dependencies {
-    compile "co.paralleluniverse:quasar-core:0.6.2-SNAPSHOT:jdk8"  // JDK 8    
-    compile "co.paralleluniverse:quasar-actors:0.6.2-SNAPSHOT"
-    compile "co.paralleluniverse:quasar-galaxy:0.6.2-SNAPSHOT"
-    compile "co.paralleluniverse:spacebase-core:2.3-SNAPSHOT:jdk8" // JDK 8
-    compile "co.paralleluniverse:spacebase-galaxy:2.3-SNAPSHOT"
-    compile "co.paralleluniverse:galaxy:1.4"
+    compile "co.paralleluniverse:quasar-core:$quasarVer:jdk8"  // JDK 8    
+    compile "co.paralleluniverse:quasar-actors:$quasarVer"
+    compile "co.paralleluniverse:quasar-galaxy:$quasarVer"
+    compile "co.paralleluniverse:spacebase-core:$spacebaseVer:jdk8" // JDK 8
+    compile "co.paralleluniverse:spacebase-galaxy:$spacebaseVer"
+    compile "co.paralleluniverse:galaxy:$galaxyVer"
     
-    quasar  "co.paralleluniverse:quasar-core:0.6.2-SNAPSHOT:jdk8@jar" // JDK 8
+    quasar  "co.paralleluniverse:quasar-core:$quasarVer:jdk8@jar" // JDK 8
 
     compile "com.google.guava:guava:18.0"
     compile "com.codahale.metrics:metrics-core:3.0.2" 
@@ -130,7 +133,7 @@ tasks.withType(JavaExec) {
     systemProperty "Log4jContextSelector", "org.apache.logging.log4j.core.async.AsyncLoggerContextSelector"
     
     // debugging
-    //jvmArgs '-ea'
+    jvmArgs '-ea'
     // systemProperty "co.paralleluniverse.debugMode", "true"
     systemProperty "co.paralleluniverse.globalFlightRecorder", "true"
     systemProperty "co.paralleluniverse.flightRecorderDumpFile", "spaceships.log"
