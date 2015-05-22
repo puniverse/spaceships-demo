@@ -10,7 +10,7 @@ This code is available under the terms of the [MIT license](http://opensource.or
 
 ## Setup
 
-JDK 7 is required. We use Gradle build system. In order to build and run type in the project directory:
+JDK 8 is required. We use Gradle build system. In order to build and run type in the project directory:
 ```sh
 ./gradlew
 ```
