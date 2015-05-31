@@ -10,15 +10,17 @@ This code is available under the terms of the [MIT license](http://opensource.or
 
 ## Setup
 
-JDK 7 is required. We use Gradle build system. In order to build and run type in the project directory:
+JDK 8 is required, download it [here](http://www.oracle.com/technetwork/java/javase/downloads/jdk8-downloads-2133151.html). We use Gradle build system, download it [here](https://gradle.org/). **Ensure that both tools are in your PATH.**
+
+In order to build and run type in the project directory:
 ```sh
-./gradlew
+gradle
 ```
 or in windows:
 ```
-gradlew.bat
+gradle.bat
 ```
-This will download and install gradle build system and the build and run the project.
+
 Enjoy !
 
 ## Usage
