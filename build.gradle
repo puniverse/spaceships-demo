@@ -26,14 +26,14 @@ configurations {
 }
     
 dependencies {
-    compile "co.paralleluniverse:quasar-core:0.6.2-SNAPSHOT:jdk8"  // JDK 8    
-    compile "co.paralleluniverse:quasar-actors:0.6.2-SNAPSHOT"
-    compile "co.paralleluniverse:quasar-galaxy:0.6.2-SNAPSHOT"
-    compile "co.paralleluniverse:spacebase-core:2.3-SNAPSHOT:jdk8" // JDK 8
+    compile "co.paralleluniverse:quasar-core:0.7.0"  
+    compile "co.paralleluniverse:quasar-actors:0.7.0"
+    compile "co.paralleluniverse:quasar-galaxy:0.7.0"
+    compile "co.paralleluniverse:spacebase-core:2.3-SNAPSHOT"
     compile "co.paralleluniverse:spacebase-galaxy:2.3-SNAPSHOT"
     compile "co.paralleluniverse:galaxy:1.4"
     
-    quasar  "co.paralleluniverse:quasar-core:0.6.2-SNAPSHOT:jdk8@jar" // JDK 8
+    quasar  "co.paralleluniverse:quasar-core:0.7.0@jar"
 
     compile "com.google.guava:guava:18.0"
     compile "com.codahale.metrics:metrics-core:3.0.2" 
@@ -102,7 +102,7 @@ tasks.withType(JavaExec) {
     // Quasar
     // systemProperty "co.paralleluniverse.fibers.DefaultFiberPool.parallelism", "4"
     systemProperty "co.paralleluniverse.fibers.DefaultFiberPool.monitor", "JMX" // "METRICS" // "NONE" //
-    jvmArgs "-javaagent:${configurations.quasar.singleFile}" // =vdmc (verbose, debug, allow monitors, check class)
+    jvmArgs "-javaagent:${configurations.quasar.iterator().next()}"
     
     // Galaxy
     systemProperty 'java.net.preferIPv4Stack', 'true'
@@ -139,7 +139,7 @@ tasks.withType(JavaExec) {
 }
 
 task wrapper(type: Wrapper) {
-    gradleVersion = '2.1'
+    gradleVersion = '2.4'
 }
 
 task classpath << {
