@@ -115,12 +115,12 @@ public class Spaceship extends BasicActor<Spaceship.SpaceshipMessage, Void> {
     public String toString() {
         return "Spaceship@" + Integer.toHexString(System.identityHashCode(this)) + '(' + id + ')';
     }
-
+    
     @Override
     protected Void doRun() throws InterruptedException, SuspendExecution {
         if (phaser != null)
             phaser.register();
-
+        
         start = System.nanoTime();
         try {
             state.set($spaceship, ref());

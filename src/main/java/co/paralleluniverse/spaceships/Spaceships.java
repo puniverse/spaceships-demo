@@ -27,11 +27,13 @@ import co.paralleluniverse.common.monitoring.Counter;
 import co.paralleluniverse.common.monitoring.CpuUsageGaugeSet;
 import co.paralleluniverse.common.monitoring.Metrics;
 import co.paralleluniverse.common.monitoring.MonitorType;
+import co.paralleluniverse.common.util.Debug;
 import co.paralleluniverse.data.record.Record;
 import co.paralleluniverse.db.store.galaxy.GalaxyStore;
 import co.paralleluniverse.db.store.galaxy.MigrationListener;
 import co.paralleluniverse.fibers.*;
 import co.paralleluniverse.galaxy.Grid;
+import co.paralleluniverse.galaxy.cluster.NodeChangeListener;
 import co.paralleluniverse.spacebase.AABB;
 import co.paralleluniverse.spacebase.quasar.SpaceBase;
 import co.paralleluniverse.spacebase.quasar.SpaceBaseBuilder;
@@ -45,6 +47,7 @@ import java.io.FileOutputStream;
 import java.io.InputStreamReader;
 import java.io.PrintStream;
 import java.util.Properties;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 
 public class Spaceships {
@@ -59,6 +62,7 @@ public class Spaceships {
         System.out.println("VERSION: " + System.getProperty("java.version"));
         System.out.println("OS: " + System.getProperty("os.name"));
         System.out.println("PROCESSORS: " + Runtime.getRuntime().availableProcessors());
+        System.out.println("FORK_JOIN: " + Debug.whereIs(ForkJoinPool.class));
         System.out.println();
 
         Properties props = new Properties();
@@ -66,10 +70,12 @@ public class Spaceships {
 
         Metrics.register("cpu", new CpuUsageGaugeSet());
         Metrics.register("memory", new MemoryUsageGaugeSet());
-        
+
         int glxNode = args.length > 0 ? Integer.parseInt(args[0]) : -1;
         if (glxNode < 0)
             glxNode = Integer.parseInt(props.getProperty("galaxy.nodeId", "-1"));
+
+        System.setProperty("galaxy.node", Integer.toString(glxNode));
 
         if (glxNode >= 0) {
             if (glxNode == 0)
@@ -82,6 +88,27 @@ public class Spaceships {
             System.setProperty("galaxy.port", props.getProperty("galaxy.port", Integer.toString(7050 + glxNode)));
             System.setProperty("galaxy.slave_port", props.getProperty("galaxy.port", Integer.toString(8050 + glxNode)));
             Grid.getInstance();
+
+            Grid.getInstance().cluster().addNodeChangeListener(new NodeChangeListener() {
+
+                @Override
+                public void nodeAdded(short id) {
+                }
+
+                @Override
+                public void nodeSwitched(short id) {
+                }
+
+                @Override
+                public void nodeRemoved(short id) {
+                    try {
+                        System.err.println("XXXXXX node " + id);
+                        Debug.exit(1, Debug.getDumpFile() + "-" + Grid.getInstance().cluster().getMyNodeId());
+                    } catch (InterruptedException e) {
+                        throw new AssertionError();
+                    }
+                }
+            });
         }
 
         System.out.println("Initializing...");
@@ -246,7 +273,7 @@ public class Spaceships {
 
         if (glxNode > 0) {
             GalaxyStore store = (GalaxyStore) space.getStore();
-            
+
             store.addMigrationListener(new MigrationListener<Record<SpaceshipState>>() {
 
                 @Override

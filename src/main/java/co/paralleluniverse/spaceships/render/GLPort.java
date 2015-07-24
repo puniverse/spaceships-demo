@@ -19,6 +19,7 @@
  */
 package co.paralleluniverse.spaceships.render;
 
+import co.paralleluniverse.common.util.Debug;
 import co.paralleluniverse.data.record.Record;
 import co.paralleluniverse.data.record.RecordArray;
 import co.paralleluniverse.data.record.Records;
@@ -143,7 +144,6 @@ public class GLPort implements GLEventListener {
 //            tGLCapabilities.setAccumBlueBits(16);
 //            tGLCapabilities.setAccumGreenBits(16);
 //            tGLCapabilities.setAccumRedBits(16);
-
         if (TOOLKIT == Toolkit.NEWT || TOOLKIT == Toolkit.NEWT_CANVAS) {
             final GLWindow newt = GLWindow.create(glcaps);
 
@@ -173,7 +173,8 @@ public class GLPort implements GLEventListener {
                 @Override
                 public void windowDestroyNotify(com.jogamp.newt.event.WindowEvent arg0) {
                     animator.stop();
-                    System.exit(0);
+                    if (!Debug.isDebug())
+                        System.exit(0);
                 }
             });
             window.setSize(WINDOW_WIDTH, WINDOW_HEIGHT);
@@ -196,7 +197,8 @@ public class GLPort implements GLEventListener {
                     animator.stop();
                     window.remove(canvas);
                     window.dispose();
-                    System.exit(0);
+                    if (!Debug.isDebug())
+                        System.exit(0);
                 }
             });
 
@@ -368,7 +370,7 @@ public class GLPort implements GLEventListener {
             vao.unbind(gl);
             shaderState.unbind(gl);
         } catch (Throwable t) {
-            System.err.println("XXXXXX");
+            System.err.println("Exception thrown on rendering thread.");
             t.printStackTrace();
             throw t;
         }
@@ -428,7 +430,6 @@ public class GLPort implements GLEventListener {
 
 //        final double width = port.max(X) - port.min(X);
 //        final double height = port.max(Y) - port.min(Y);
-
         double moveStepH = horizontal * KEY_PRESS_TRANSLATE;
         if (port.min(X) + portMinXAnimation + moveStepH < bounds.min(X))
             moveStepH = bounds.min(X) - port.min(X);
