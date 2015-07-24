@@ -12,7 +12,7 @@
        default-lazy-init="false"
        default-autowire="constructor">
 
-<bean id="cluster" class="co.paralleluniverse.galaxy.jgroups.JGroupsCluster">
+    <bean id="cluster" class="co.paralleluniverse.galaxy.jgroups.JGroupsCluster">
         <constructor-arg name="nodeId" value="${galaxy.nodeId}"/>
         <constructor-arg name="jgroupsClusterName" value="cluster1"/>
         <property name="hasServer" ref="has-server"/>
@@ -83,5 +83,4 @@
             </bean>
         </property>
     </bean>
-
 </beans>

@@ -13,8 +13,8 @@
        default-autowire="constructor">
 
     <bean id="has-server" class="java.lang.Boolean" c:_0="false"/>
-
-    <bean id="comm" class="co.paralleluniverse.galaxy.netty.UDPComm">
+    
+    <!--    <bean id="comm" class="co.paralleluniverse.galaxy.netty.UDPComm">
         <constructor-arg name="serverComm">
             <null/>
         </constructor-arg>
@@ -33,7 +33,7 @@
         <property name="jitter" value="false"/>
         <property name="minDelayMicrosecs" value="500"/>
         <property name="maxDelayMicrosecs" value="2000"/>
-        <property name="maxQueueSize" value="10"/>
+        <property name="maxQueueSize" value="100"/>
         <property name="maxPacketSize" value="4096"/>
         <property name="maxRequestOnlyPacketSize" value="512"/>
         <property name="workerExecutor">
@@ -46,14 +46,20 @@
         </property>
         <property name="receiveExecutor">
             <bean class="org.jboss.netty.handler.execution.OrderedMemoryAwareThreadPoolExecutor">
-                <constructor-arg index="0" value="8"/> <!-- name="corePoolSize" -->
-                <constructor-arg index="1" value="0"/> <!-- name="maxChannelMemorySize" -->
-                <constructor-arg index="2" value="0"/> <!-- name="maxTotalMemorySize" -->
-                <constructor-arg index="3" value="5000"/> <!-- name="keepAliveTime" -->
-                <constructor-arg index="4" value="MILLISECONDS"/> <!-- name="unit" -->
+                <constructor-arg index="0" value="8"/>  name="corePoolSize" 
+                <constructor-arg index="1" value="0"/>  name="maxChannelMemorySize" 
+                <constructor-arg index="2" value="0"/>  name="maxTotalMemorySize" 
+                <constructor-arg index="3" value="5000"/>  name="keepAliveTime" 
+                <constructor-arg index="4" value="MILLISECONDS"/>  name="unit" 
             </bean>
         </property>
-    </bean>
+    </bean>-->
     
+    <bean id="comm" class="co.paralleluniverse.galaxy.jgroups.JGroupsComm">
+        <constructor-arg name="cluster" ref="cluster"/>
+        <constructor-arg name="serverComm" ref="serverComm"/>
+        <property name="timeout" value="2000"/>
+    </bean>
+
     <bean id="serverComm" class="co.paralleluniverse.common.spring.NullBean"/>
 </beans>
