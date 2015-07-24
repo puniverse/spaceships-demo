@@ -114,7 +114,7 @@ run {
 tasks.withType(JavaExec) {
     jvmArgs '-server'
     // systemProperty 'headless', 'true'
-    jvmArgs "-Xbootclasspath/p:${System.getProperty("user.home")}/jsr166.jar"
+    // jvmArgs "-Xbootclasspath/p:${System.getProperty("user.home")}/jsr166.jar"
     
     // Quasar
     // systemProperty "co.paralleluniverse.fibers.DefaultFiberPool.parallelism", "4"
