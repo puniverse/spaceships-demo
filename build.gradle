@@ -113,7 +113,7 @@ run {
 
 tasks.withType(JavaExec) {
     jvmArgs '-server'
-    systemProperty 'headless', 'true'
+    // systemProperty 'headless', 'true'
     jvmArgs "-Xbootclasspath/p:${System.getProperty("user.home")}/jsr166.jar"
     
     // Quasar
