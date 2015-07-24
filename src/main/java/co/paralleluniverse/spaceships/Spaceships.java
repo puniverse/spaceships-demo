@@ -295,6 +295,14 @@ public class Spaceships {
         return space;
     }
 
+    private GLPort startGraphics() throws InterruptedException {
+        if (Boolean.getBoolean("headless"))
+            return null;
+
+        Thread.sleep(5000); // wait for things to optimize a bit.
+        return new GLPort(toolkit, N + 20, Spaceships.this, bounds, glxNode);
+    }
+
     /**
      * Main loop: loops over all spaceships and initiates each spaceship's actions. Simulates an IO thread receiving commands over the net.
      */
@@ -307,8 +315,7 @@ public class Spaceships {
             }
         }.spawn();
 
-        Thread.sleep(5000); // wait for things to optimize a bit.
-        port = new GLPort(toolkit, N + 20, Spaceships.this, bounds, glxNode);
+        port = startGraphics();
 
         if (timeStream != null)
             timeStream.println("# time, millis, millis1, millis0");
