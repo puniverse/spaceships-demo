@@ -8,7 +8,7 @@ version = "2.1-SNAPSHOT"
 mainClassName = 'co.paralleluniverse.spaceships.Spaceships'
 ext.mainClass = mainClassName
 
-ext.quasarVer = '0.6.3-SNAPSHOT'
+ext.quasarVer = '0.7.3-SNAPSHOT'
 ext.spacebaseVer = '2.3-SNAPSHOT'
 ext.galaxyVer = '1.4.1-SNAPSHOT'
 ext.jogampVer   = '2.2.1'
@@ -27,20 +27,32 @@ configurations {
     quasar
     natives
 }
+
+//configurations.all {
+//    resolutionStrategy {
+//        failOnVersionConflict()
+//    }
+//}
     
 dependencies {
     compile "co.paralleluniverse:quasar-core:$quasarVer:jdk8"  // JDK 8    
     compile "co.paralleluniverse:quasar-actors:$quasarVer"
-    compile "co.paralleluniverse:quasar-galaxy:$quasarVer"
-    compile "co.paralleluniverse:spacebase-core:$spacebaseVer:jdk8" // JDK 8
-    compile "co.paralleluniverse:spacebase-galaxy:$spacebaseVer"
+    compile("co.paralleluniverse:quasar-galaxy:$quasarVer") {
+        exclude group: 'co.paralleluniverse', module: '*'
+    }
+    compile("co.paralleluniverse:spacebase-core:$spacebaseVer:jdk8") { // JDK 8
+        exclude group: 'co.paralleluniverse', module: '*'
+    }
+    compile("co.paralleluniverse:spacebase-galaxy:$spacebaseVer") {
+        exclude group: 'co.paralleluniverse', module: '*'
+    }
     compile "co.paralleluniverse:galaxy:$galaxyVer"
     
     quasar  "co.paralleluniverse:quasar-core:$quasarVer:jdk8@jar" // JDK 8
 
     compile "com.google.guava:guava:18.0"
-    compile "com.codahale.metrics:metrics-core:3.0.2" 
-    compile "com.codahale.metrics:metrics-jvm:3.0.2" 
+    compile "io.dropwizard.metrics:metrics-core:3.1.2" 
+    compile "io.dropwizard.metrics:metrics-jvm:3.1.2" 
     compile 'org.apache.commons:commons-lang3:3.1'
 
     compile ":jogl-all:$jogampVer"
@@ -52,14 +64,14 @@ dependencies {
             ":gluegen-rt:$jogampVer:natives-windows-i586", ":gluegen-rt:$jogampVer:natives-windows-amd64", 
             ":gluegen-rt:$jogampVer:natives-macosx-universal" 
     
-//        natives "org.jogamp.jogl:jogl-all:$jogampVer"
-//        natives "org.jogamp.gluegen:gluegen-rt:$jogampVer"
-//        natives "org.jogamp.jogl:jogl-all:$jogampVer:natives-linux-i586", "org.jogamp.jogl:jogl-all:$jogampVer:natives-linux-amd64", 
-//                "org.jogamp.jogl:jogl-all:$jogampVer:natives-windows-i586", "org.jogamp.jogl:jogl-all:$jogampVer:natives-windows-amd64", 
-//                "org.jogamp.jogl:jogl-all:$jogampVer:natives-macosx-universal"
-//        natives "org.jogamp.gluegen:gluegen-rt:$jogampVer:natives-linux-i586", "org.jogamp.gluegen:gluegen-rt:$jogampVer:natives-linux-amd64", 
-//                "org.jogamp.gluegen:gluegen-rt:$jogampVer:natives-windows-i586", "org.jogamp.gluegen:gluegen-rt:$jogampVer:natives-windows-amd64", 
-//                "org.jogamp.gluegen:gluegen-rt:$jogampVer:natives-macosx-universal"      
+    //        natives "org.jogamp.jogl:jogl-all:$jogampVer"
+    //        natives "org.jogamp.gluegen:gluegen-rt:$jogampVer"
+    //        natives "org.jogamp.jogl:jogl-all:$jogampVer:natives-linux-i586", "org.jogamp.jogl:jogl-all:$jogampVer:natives-linux-amd64", 
+    //                "org.jogamp.jogl:jogl-all:$jogampVer:natives-windows-i586", "org.jogamp.jogl:jogl-all:$jogampVer:natives-windows-amd64", 
+    //                "org.jogamp.jogl:jogl-all:$jogampVer:natives-macosx-universal"
+    //        natives "org.jogamp.gluegen:gluegen-rt:$jogampVer:natives-linux-i586", "org.jogamp.gluegen:gluegen-rt:$jogampVer:natives-linux-amd64", 
+    //                "org.jogamp.gluegen:gluegen-rt:$jogampVer:natives-windows-i586", "org.jogamp.gluegen:gluegen-rt:$jogampVer:natives-windows-amd64", 
+    //                "org.jogamp.gluegen:gluegen-rt:$jogampVer:natives-macosx-universal"      
 }
 
 sourceSets {  
@@ -101,12 +113,14 @@ run {
 
 tasks.withType(JavaExec) {
     jvmArgs '-server'
+    systemProperty 'headless', 'true'
+    jvmArgs "-Xbootclasspath/p:${System.getProperty("user.home")}/jsr166.jar"
     
     // Quasar
     // systemProperty "co.paralleluniverse.fibers.DefaultFiberPool.parallelism", "4"
     systemProperty "co.paralleluniverse.fibers.DefaultFiberPool.monitor", "JMX" // "METRICS" // "NONE" //
     jvmArgs "-javaagent:${configurations.quasar.singleFile}" // =vdmc (verbose, debug, allow monitors, check class)
-    
+        
     // Galaxy
     systemProperty 'java.net.preferIPv4Stack', 'true'
     // systemProperty "jgroups.bind_addr", "127.0.0.1"
@@ -127,18 +141,19 @@ tasks.withType(JavaExec) {
     // jvmArgs '-verbose:gc'
     // jvmArgs '-XX:+UnlockDiagnosticVMOptions', '-XX:+TraceClassLoading', '-XX:+LogCompilation' // use with jitwatch
     // jvmArgs '-XX:+UnlockDiagnosticVMOptions', '-XX:+PrintInlining'
+    // jvmArgs '-XX:+UnlockDiagnosticVMOptions', '-XX:+PrintAssembly'
     
     // logging
     systemProperty "log4j.configurationFile", "${rootProject.projectDir}/log4j.xml"
-    systemProperty "Log4jContextSelector", "org.apache.logging.log4j.core.async.AsyncLoggerContextSelector"
+    // systemProperty "Log4jContextSelector", "org.apache.logging.log4j.core.async.AsyncLoggerContextSelector"
     
     // debugging
     jvmArgs '-ea'
     // systemProperty "co.paralleluniverse.debugMode", "true"
-    systemProperty "co.paralleluniverse.globalFlightRecorder", "true"
+    // systemProperty "co.paralleluniverse.globalFlightRecorder", "true"
     systemProperty "co.paralleluniverse.flightRecorderDumpFile", "spaceships.log"
-    systemProperty "co.paralleluniverse.monitoring.flightRecorderLevel", "1"
-    systemProperty "co.paralleluniverse.monitoring.flightRecorderSize","100000" 
+    systemProperty "co.paralleluniverse.monitoring.flightRecorderLevel", "2"
+    systemProperty "co.paralleluniverse.monitoring.flightRecorderSize","500000" 
 }
 
 task wrapper(type: Wrapper) {
