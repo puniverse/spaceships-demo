@@ -26,14 +26,14 @@ configurations {
 }
     
 dependencies {
-    compile "co.paralleluniverse:quasar-core:0.6.2-SNAPSHOT:jdk8"  // JDK 8    
-    compile "co.paralleluniverse:quasar-actors:0.6.2-SNAPSHOT"
-    compile "co.paralleluniverse:quasar-galaxy:0.6.2-SNAPSHOT"
+    compile "co.paralleluniverse:quasar-core:0.7.3:jdk8"  // JDK 8    
+    compile "co.paralleluniverse:quasar-actors:0.7.3"
+    compile "co.paralleluniverse:quasar-galaxy:0.7.3"
     compile "co.paralleluniverse:spacebase-core:2.3-SNAPSHOT:jdk8" // JDK 8
     compile "co.paralleluniverse:spacebase-galaxy:2.3-SNAPSHOT"
     compile "co.paralleluniverse:galaxy:1.4"
     
-    quasar  "co.paralleluniverse:quasar-core:0.6.2-SNAPSHOT:jdk8@jar" // JDK 8
+    quasar  "co.paralleluniverse:quasar-core:0.7.3:jdk8@jar" // JDK 8
 
     compile "com.google.guava:guava:18.0"
     compile "com.codahale.metrics:metrics-core:3.0.2" 
